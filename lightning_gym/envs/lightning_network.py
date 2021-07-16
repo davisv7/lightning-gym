@@ -6,6 +6,8 @@ from bidict import bidict
 from ..utils import *
 from ..GCN import GCN
 import dgl
+import torch
+import torch.nn.functional as F
 
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
@@ -30,40 +32,41 @@ class NetworkEnvironment(Env):
         self.dyn_btwn_getter = None
         self.btwn_cent = 0
         self.gcn = None
-        self.state = None
+        self.edge_vector = None
         self.features = None
 
     def get_features(self):
         bc = nk.centrality.Betweenness(self.nk_g, )
         bc.run()
-        b_centralities = bc.scores()
+        b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)
         print(b_centralities)
 
         dc = nk.centrality.DegreeCentrality(self.nk_g)
         dc.run()
-        d_centralities = dc.scores()
+        d_centralities = torch.Tensor(dc.scores()).unsqueeze(-1)
         print(d_centralities)
 
-        self.features = zip(b_centralities, d_centralities, self.state)
+        self.features = torch.cat((b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
+        x = 1
 
     def step(self, action: int):
         done = False
         # calculate reward
-        if self.state[action] == 1:
+        if self.edge_vector[action] == 1:
             reward = 0
             done = True
         else:
             # what if, by adding a node twice, we remove it? increase budget, reward is negative change
             # we would have to reinit the betweenness calculator on edge removals, which isn't terrible
-            self.state[action] = 1
+            self.edge_vector[action] = 1
             reward = self.get_reward(action)
 
         # check if done with budget
-        if sum(self.state) == self.budget:
+        if sum(self.edge_vector) == self.budget:
             done = True
 
         info = {}
-        return self.state, reward, done, info
+        return self.gcn(self.dgl_g), reward, done, info
 
     def get_reward(self, action):
         neighbor_index = action
@@ -93,12 +96,17 @@ class NetworkEnvironment(Env):
         self.dgl_g = dgl.from_networkx(nx_graph)
         self.graph_size = len(nx_graph.nodes())
 
-        self.state = [0 for _ in range(self.graph_size)]
+        self.edge_vector = [0 for _ in range(self.graph_size)]
 
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
         self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
 
         self.get_features()
+
+        self.dgl_g.ndata['features'] = self.features
+
+        self.gcn = GCN(3, 4, 3, 2, F.relu)
+
 
         if self.node_id is None:
             # self.index_to_node[self.graph_size] = self.node_id
@@ -112,7 +120,7 @@ class NetworkEnvironment(Env):
         done = False
         self.action_space = Discrete(self.graph_size)
 
-        return self.state, done
+        return self.gcn(self.dgl_g), done
 
     # render on frame of environment at a time
     def render(self, mode='channel'):

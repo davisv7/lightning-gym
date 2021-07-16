@@ -14,3 +14,4 @@ for i in range(budget):
     total_reward += reward
     print(
         f"by adding node {env.index_to_node[action]}, our betweenness centrality by {reward:.5f} for a total of {total_reward}")
+    print(state.shape)

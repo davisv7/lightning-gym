@@ -10,15 +10,16 @@ from dgl.nn.pytorch import GraphConv
 
 class GCN(nn.Module):
     def __init__(self,
-                 g,
+                 # g,
                  in_feats,
                  n_hidden,
                  n_classes,
                  n_layers,
-                 activation,
-                 dropout):
+                 activation
+                 #dropout
+                 ):
         super(GCN, self).__init__()
-        self.g = g
+        # self.g = g
         self.layers = nn.ModuleList()
         # input layer
         self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
@@ -27,12 +28,12 @@ class GCN(nn.Module):
             self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
         # output layer
         self.layers.append(GraphConv(n_hidden, n_classes))
-        self.dropout = nn.Dropout(p=dropout)
+        # self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, features):
-        h = features
+    def forward(self, g):
+        h = g.ndata['features']
         for i, layer in enumerate(self.layers):
-            if i != 0:
-                h = self.dropout(h)
-            h = layer(self.g, h)
+            # if i != 0:
+            #     h = self.dropout(h)
+            h = layer(g, h)
         return h
