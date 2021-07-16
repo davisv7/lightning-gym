@@ -11,6 +11,8 @@ from networkit import Graph as nk_Graph
 from bidict import bidict
 from typing import Dict
 from ..utils import *
+from ..GCN import GCN
+import dgl
 
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
@@ -30,9 +32,14 @@ class NetworkEnvironment(Env):
         self.node_index = None
         self.index_to_node = bidict()
         self.nk_g = None
+        self.dgl_g = None
         self.graph_size = None
         self.dyn_btwn_getter = None
         self.btwn_cent = 0
+        self.gcn = None
+
+    def get_features(self,nx_graph):
+        pass
 
     def step(self, action: int):
         done = False
@@ -77,7 +84,7 @@ class NetworkEnvironment(Env):
 
         # Create nx_graph
         nx_graph = make_nx_graph(nodes, edges)
-
+        self.dgl_g = dgl.from_networkx(nx_graph)
         self.graph_size = len(nx_graph.nodes())
 
         self.state = [0 for _ in range(self.graph_size)]
