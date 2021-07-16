@@ -1,15 +1,8 @@
 from gym import Env, logger, spaces
 from gym.spaces import Discrete, Box
 import numpy as np
-import json
-import networkx as nx
-from os import getcwd, path, listdir
-from random import choice
 import networkit as nk
-from networkx import Graph as nx_Graph
-from networkit import Graph as nk_Graph
 from bidict import bidict
-from typing import Dict
 from ..utils import *
 from ..GCN import GCN
 import dgl
@@ -37,17 +30,31 @@ class NetworkEnvironment(Env):
         self.dyn_btwn_getter = None
         self.btwn_cent = 0
         self.gcn = None
+        self.state = None
+        self.features = None
 
-    def get_features(self,nx_graph):
-        pass
+    def get_features(self):
+        bc = nk.centrality.Betweenness(self.nk_g, )
+        bc.run()
+        b_centralities = bc.scores()
+        print(b_centralities)
+
+        dc = nk.centrality.DegreeCentrality(self.nk_g)
+        dc.run()
+        d_centralities = dc.scores()
+        print(d_centralities)
+
+        self.features = zip(b_centralities, d_centralities, self.state)
 
     def step(self, action: int):
         done = False
         # calculate reward
         if self.state[action] == 1:
-            reward = -float("inf")
+            reward = 0
             done = True
         else:
+            # what if, by adding a node twice, we remove it? increase budget, reward is negative change
+            # we would have to reinit the betweenness calculator on edge removals, which isn't terrible
             self.state[action] = 1
             reward = self.get_reward(action)
 
@@ -62,7 +69,7 @@ class NetworkEnvironment(Env):
         neighbor_index = action
         event_type = 3  # nk.dynamic.GraphEvent.EDGE_ADDITION = 3
 
-        #add an edge in one direction
+        # add an edge in one direction
         self.nk_g.addEdge(self.node_index, neighbor_index, w=1)
         event = nk.dynamic.GraphEvent(event_type, self.node_index, neighbor_index, 1)
         self.dyn_btwn_getter.update(event)
@@ -71,7 +78,6 @@ class NetworkEnvironment(Env):
         self.nk_g.addEdge(neighbor_index, self.node_index, w=1)
         event = nk.dynamic.GraphEvent(event_type, neighbor_index, self.node_index, 1)
         self.dyn_btwn_getter.update(event)
-
         new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
         reward = new_btwn - self.btwn_cent
         self.btwn_cent = new_btwn
@@ -91,6 +97,8 @@ class NetworkEnvironment(Env):
 
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
         self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
+
+        self.get_features()
 
         if self.node_id is None:
             # self.index_to_node[self.graph_size] = self.node_id
