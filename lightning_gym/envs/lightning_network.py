@@ -9,6 +9,7 @@ import dgl
 import torch
 import torch.nn.functional as F
 import random
+from ..Logger import Logger
 
 '''
     Get the current directory.
@@ -17,7 +18,6 @@ import random
 
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
-
 
 # Environment Class
 class NetworkEnvironment(Env):
@@ -42,6 +42,7 @@ class NetworkEnvironment(Env):
         self.features = None
         self.nodes = None
         self.edges = None
+        self.r_logger = Logger()
 
     def get_features(self):
 
@@ -111,6 +112,8 @@ class NetworkEnvironment(Env):
         self.dyn_btwn_getter.update(event)
         new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
         reward = new_btwn - self.btwn_cent
+        # Adding reward to logger
+        self.r_logger.add_logger(reward)
         self.btwn_cent = new_btwn
         return reward
 
