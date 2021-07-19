@@ -1,18 +1,24 @@
-# from lightning_network import *
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 import warnings
+from ActorCritic import DiscreteActorCritic
 
 warnings.filterwarnings("ignore")
 
-budget = 50
-node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
+budget = 10
+# node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
+node_id = None
 # Initial Budget
 env = NetworkEnvironment(budget=budget, node_id=node_id)  # Create class instance
-env.reset()  # Why reset?
+# env.reset()  # Why reset?
 total_reward = 0
 
+agent = DiscreteActorCritic(env, cuda_flag=False, load_model=False)
+for i in range(1000):
+    log = agent.train()
+
+# obs = env.reset()
 # for i in range(budget):  # Iterate each int for our budget range
-#     action = env.action_space.sample()  # Take a random action: An action is a node
+#     action, _states = model.predict(obs)
 #     state, reward, done, _ = env.step(action)  # Make the envrioment take that step
 #     total_reward += reward  # Update the reward
 #     print('Action', action)
@@ -20,28 +26,3 @@ total_reward = 0
 #         f"by adding node {env.index_to_node[action]},"
 #         f" our betweenness centrality by {reward:.5f} for a total of {total_reward}")
 #     print(state.shape, '\n')
-#
-# env.r_logger.plot_logger()
-
-import gym
-
-from stable_baselines3 import PPO
-from stable_baselines3.common.env_util import make_vec_env
-
-# Parallel environments
-env = make_vec_env("CartPole-v1", n_envs=4)
-
-model = PPO("MlpPolicy", env, verbose=1)
-model.learn(total_timesteps=25000)
-# model.save("ppo_cartpole")
-#
-# del model # remove to demonstrate saving and loading
-
-# model = PPO.load("ppo_cartpole")
-
-obs = env.reset()
-while True:
-    action, _states = model.predict(obs)
-    obs, rewards, dones, info = env.step(action)
-    env.render()
-

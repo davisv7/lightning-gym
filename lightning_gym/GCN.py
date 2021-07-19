@@ -7,6 +7,8 @@ References:
 import torch
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
+from dgl import readout_nodes
+
 
 class GCN(nn.Module):
     def __init__(self,
@@ -18,6 +20,8 @@ class GCN(nn.Module):
                  # dropout
                  ):
         super(GCN, self).__init__()
+        self.policy = nn.Linear(n_classes, 1)
+        self.value = nn.Linear(n_classes, 1, )
         self.layers = nn.ModuleList()  # Create empty list of layers
         # input layer
         self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
@@ -34,4 +38,9 @@ class GCN(nn.Module):
             # if i != 0:
             #     h = self.dropout(h)
             h = layer(g, h)
-        return h
+        g.ndata['h'] = h
+        mN = readout_nodes(g, 'h')
+        PI = self.policy(h)
+        V = self.value(mN)
+        g.ndata.pop('h')
+        return PI, V

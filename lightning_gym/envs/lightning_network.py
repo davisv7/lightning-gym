@@ -19,6 +19,7 @@ from ..Logger import Logger
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
 
+
 # Environment Class
 class NetworkEnvironment(Env):
 
@@ -27,8 +28,6 @@ class NetworkEnvironment(Env):
         :param budget:
         """
         self.budget = budget  # number of channels that can add to graph
-        self.action_space = None
-        self.observation_space = Box(low=np.array([0]), high=np.array([2]))
         self.node_id = node_id
         self.node_index = None
         self.index_to_node = bidict()
@@ -43,6 +42,8 @@ class NetworkEnvironment(Env):
         self.nodes = None
         self.edges = None
         self.r_logger = Logger()
+        self.repeat = True
+        self.budget_offset = 0
 
     def get_features(self):
 
@@ -56,19 +57,15 @@ class NetworkEnvironment(Env):
         bc = nk.centrality.Betweenness(self.nk_g, )  # Pa
         bc.run()  # Run the algorithm
         b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)
-        # print(b_centralities)
         '''Initialize Algorithm
         Indicates how close a node is to all other nodes in the network. 
         '''
-        dc = nk.centrality.DegreeCentrality(self.nk_g)
+        dc = nk.centrality.DegreeCentrality(self.nk_g, normalized=True)
         # Run the algorithm
         dc.run()
         d_centralities = torch.Tensor(dc.scores()).unsqueeze(-1)
-        # print(d_centralities)
 
-        # ???
         self.features = torch.cat((b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
-        # x = 1
 
     def update_features(self):
         col_idx = torch.Tensor(np.repeat(-1, self.features.size(0))).long()
@@ -91,11 +88,17 @@ class NetworkEnvironment(Env):
             reward = self.get_reward(action)
 
         # check if done with budget
-        if sum(self.edge_vector) == self.budget:
+        if sum(self.edge_vector) == self.budget + self.budget_offset:
             done = True
+            print(self.btwn_cent)
 
         info = {}
-        return self.gcn(self.dgl_g), reward, done, info
+        return self.gcn.forward(self.dgl_g), torch.Tensor([reward]), done, info
+
+    def get_illegal_actions(self):
+        illegal = (self.edge_vector == 1.).nonzero()
+        legal = (self.edge_vector == 0.).nonzero()
+        return illegal, legal
 
     def get_reward(self, action):
         neighbor_index = action
@@ -128,11 +131,11 @@ class NetworkEnvironment(Env):
         self.dgl_g = dgl.from_networkx(nx_graph)
         self.graph_size = len(nx_graph.nodes())
 
-
         # Create tuples index : pubKey into bidictionary
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
 
+        self.budget_offset = 0
         self.get_edge_vector_from_node()
         # Passing network kit graph
         self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
@@ -144,8 +147,8 @@ class NetworkEnvironment(Env):
         self.gcn = GCN(
             in_feats=3,
             n_hidden=4,
-            n_classes=3,
-            n_layers=2,
+            n_classes=1,
+            n_layers=1,
             activation=F.relu)
 
         if self.node_id is None:
@@ -160,30 +163,27 @@ class NetworkEnvironment(Env):
         self.dyn_btwn_getter.run()
         self.btwn_cent = self.dyn_btwn_getter.getbcx() / ((self.graph_size - 1) * (self.graph_size - 2) / 2)
 
-        done = False
-        self.action_space = Discrete(self.graph_size)
+        obs = self.gcn.forward(self.dgl_g)
 
-        return self.gcn(self.dgl_g), done
+        return obs
 
     # render on frame of environment at a time
 
     # Given public ID number from a node
     def get_edge_vector_from_node(self):
         # Create a vector of zeros to the length of the graph_size
-        self.edge_vector = [0 for _ in range(self.graph_size)]
+        self.edge_vector = np.array([0 for _ in range(self.graph_size)])
 
         if self.node_id is not None:
-            print("Node ID", self.node_id)
             for edge in self.edges:
                 if edge[0] == self.node_id:
-                    print("Neighbor", edge[1])
                     neighbor_index = self.index_to_node.inverse[edge[1]]
                     self.edge_vector[neighbor_index] = 1
+                    self.budget_offset += 1
 
         return self.edge_vector
 
     def get_random_node_key(self):
-        self.nodes
         random_key = random.choice(self.nodes)
         return random_key
 
