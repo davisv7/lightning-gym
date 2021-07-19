@@ -10,15 +10,15 @@ from dgl.nn.pytorch import GraphConv
 
 class GCN(nn.Module):
     def __init__(self,
-                 in_feats, # Number of features each node has
-                 n_hidden, # Size of Hidden Features (Neighbors features)
-                 n_classes, #Size of final features vector
-                 n_layers, # Number fo layers
-                 activation # Actication layer Relu in our case
-                 #dropout
+                 in_feats,  # Number of features each node has
+                 n_hidden,  # Size of Hidden Features (Neighbors features)
+                 n_classes,  # Size of final features vector
+                 n_layers,  # Number fo layers
+                 activation  # Activation layer Relu in our case
+                 # dropout
                  ):
         super(GCN, self).__init__()
-        self.layers = nn.ModuleList() #Create empty list of layers
+        self.layers = nn.ModuleList()  # Create empty list of layers
         # input layer
         self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
         # hidden layers

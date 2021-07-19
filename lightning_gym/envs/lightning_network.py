@@ -45,10 +45,11 @@ class NetworkEnvironment(Env):
 
     def get_features(self):
 
-        '''     Initialize Algorithm
+        '''
+        Initialize Algorithm
         Measures the extent to which a node lies on shortest
         paths between other nodes. Nodes with high betweeness
-        could have considerable more influce.
+        could have considerable more influence.
         '''
 
         bc = nk.centrality.Betweenness(self.nk_g, )  # Pa
