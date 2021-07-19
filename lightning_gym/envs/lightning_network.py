@@ -124,11 +124,12 @@ class NetworkEnvironment(Env):
         self.dgl_g = dgl.from_networkx(nx_graph)
         self.graph_size = len(nx_graph.nodes())
 
-        self.get_edge_vector_from_node()
 
         # Create tuples index : pubKey into bidictionary
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
+
+        self.get_edge_vector_from_node()
         # Assing network kit graph
         self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
 
@@ -148,6 +149,9 @@ class NetworkEnvironment(Env):
             self.node_index = self.graph_size
             self.nk_g.addNode()
 
+        else:
+            self.node_index = self.index_to_node.inverse[self.node_id]
+
         self.dyn_btwn_getter = nk.centrality.DynBetweennessOneNode(self.nk_g, self.node_index)
         self.dyn_btwn_getter.run()
         self.btwn_cent = self.dyn_btwn_getter.getbcx() / ((self.graph_size - 1) * (self.graph_size - 2) / 2)
@@ -165,8 +169,10 @@ class NetworkEnvironment(Env):
         self.edge_vector = [0 for _ in range(self.graph_size)]
 
         if self.node_id is not None:
+            print("Node ID", self.node_id)
             for edge in self.edges:
                 if edge[0] == self.node_id:
+                    print("Neighbor", edge[1])
                     neighbor_index = self.index_to_node.inverse[edge[1]]
                     self.edge_vector[neighbor_index] = 1
 
