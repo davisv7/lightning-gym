@@ -131,7 +131,7 @@ class NetworkEnvironment(Env):
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
 
         self.get_edge_vector_from_node()
-        # Assing network kit graph
+        # Passing network kit graph
         self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
 
         self.get_features()
