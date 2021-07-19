@@ -32,17 +32,16 @@ class NetworkEnvironment(Env):
         self.node_id = node_id
         self.node_index = None
         self.index_to_node = bidict()
-        self.nk_g = None #Networkit graph
-        self.dgl_g = None  #Make DGL graph
+        self.nk_g = None  # Networkit graph
+        self.dgl_g = None  # Make DGL graph
         self.graph_size = None
         self.dyn_btwn_getter = None
-        self.btwn_cent = 0 #Betweens
+        self.btwn_cent = 0  # Betweens
         self.gcn = None
         self.edge_vector = None
         self.features = None
         self.nodes = None
         self.edges = None
-
 
     def get_features(self):
 
@@ -52,15 +51,15 @@ class NetworkEnvironment(Env):
         could have considerable more influce.
         '''
 
-        bc = nk.centrality.Betweenness(self.nk_g, ) # Pa
-        bc.run() #Run the algorithm
+        bc = nk.centrality.Betweenness(self.nk_g, )  # Pa
+        bc.run()  # Run the algorithm
         b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)
         # print(b_centralities)
         '''Initialize Algorithm
         Indicates how close a node is to all other nodes in the network. 
         '''
         dc = nk.centrality.DegreeCentrality(self.nk_g)
-        #Run the algorithm
+        # Run the algorithm
         dc.run()
         d_centralities = torch.Tensor(dc.scores()).unsqueeze(-1)
         # print(d_centralities)
@@ -68,6 +67,14 @@ class NetworkEnvironment(Env):
         # ???
         self.features = torch.cat((b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
         # x = 1
+
+    def update_features(self):
+        col_idx = torch.Tensor(np.repeat(-1, self.features.size(0))).long()
+        rows = torch.arange(self.features.size(0)).long()
+        update_values = torch.FloatTensor(self.edge_vector)
+
+        self.features[rows, col_idx] = update_values
+        self.dgl_g.ndata["features"] = self.features
 
     def step(self, action: int):
         done = False
@@ -110,28 +117,31 @@ class NetworkEnvironment(Env):
         # gets random file name, loads graphs, returns state
         randomfilename = get_random_filename()
         nodes, edges = load_json(path.join(SAMPLEDIRECTORY, randomfilename))
-        self.nodes = nodes # Added nodes
-        self.edges = edges # Added edges
+        self.nodes = nodes  # Added nodes
+        self.edges = edges  # Added edges
         # Create nx_graph
         nx_graph = make_nx_graph(nodes, edges)
         self.dgl_g = dgl.from_networkx(nx_graph)
         self.graph_size = len(nx_graph.nodes())
 
-        #Create a vector of zeros to the length of the graph_size
-        self.edge_vector = [0 for _ in range(self.graph_size)]
+        self.get_edge_vector_from_node()
 
-        #Create tuples index : pubKey into bidictionary
+        # Create tuples index : pubKey into bidictionary
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
-        #Assing network kit graph
+        # Assing network kit graph
         self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
 
         self.get_features()
 
         self.dgl_g.ndata['features'] = self.features
 
-        self.gcn = GCN(self,3, 4, 3, 2, F.relu)
-
+        self.gcn = GCN(
+            in_feats=3,
+            n_hidden=4,
+            n_classes=3,
+            n_layers=2,
+            activation=F.relu)
 
         if self.node_id is None:
             # self.index_to_node[self.graph_size] = self.node_id
@@ -149,20 +159,18 @@ class NetworkEnvironment(Env):
 
     # render on frame of environment at a time
 
-    #Given public ID number from a node
-    def get_edge_vector_from_node (self, pubKey :str):
+    # Given public ID number from a node
+    def get_edge_vector_from_node(self):
+        # Create a vector of zeros to the length of the graph_size
+        self.edge_vector = [0 for _ in range(self.graph_size)]
 
-        source_target = []
-        edges_number = []
-        for edge in self.edges:
-            if edge[0] == pubKey:
-                source_target.append(edge[1])
-                inverse_edge = self.index_to_node.inverse[edge[1]]
-                edges_number.append(inverse_edge)
-                self.edge_vector[inverse_edge] = 1
+        if self.node_id is not None:
+            for edge in self.edges:
+                if edge[0] == self.node_id:
+                    neighbor_index = self.index_to_node.inverse[edge[1]]
+                    self.edge_vector[neighbor_index] = 1
 
-        return source_target, edges_number, self.edge_vector
-
+        return self.edge_vector
 
     def get_random_node_key(self):
         self.nodes
