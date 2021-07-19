@@ -8,6 +8,12 @@ from ..GCN import GCN
 import dgl
 import torch
 import torch.nn.functional as F
+import random
+
+'''
+    Get the current directory.
+    Join the current directory with the name of file. Sample_Snapshots
+'''
 
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
@@ -26,28 +32,42 @@ class NetworkEnvironment(Env):
         self.node_id = node_id
         self.node_index = None
         self.index_to_node = bidict()
-        self.nk_g = None
-        self.dgl_g = None
+        self.nk_g = None #Networkit graph
+        self.dgl_g = None  #Make DGL graph
         self.graph_size = None
         self.dyn_btwn_getter = None
-        self.btwn_cent = 0
+        self.btwn_cent = 0 #Betweens
         self.gcn = None
         self.edge_vector = None
         self.features = None
+        self.nodes = None
+        self.edges = None
+
 
     def get_features(self):
-        bc = nk.centrality.Betweenness(self.nk_g, )
-        bc.run()
-        b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)
-        print(b_centralities)
 
+        '''     Initialize Algorithm
+        Measures the extent to which a node lies on shortest
+        paths between other nodes. Nodes with high betweeness
+        could have considerable more influce.
+        '''
+
+        bc = nk.centrality.Betweenness(self.nk_g, ) # Pa
+        bc.run() #Run the algorithm
+        b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)
+        # print(b_centralities)
+        '''Initialize Algorithm
+        Indicates how close a node is to all other nodes in the network. 
+        '''
         dc = nk.centrality.DegreeCentrality(self.nk_g)
+        #Run the algorithm
         dc.run()
         d_centralities = torch.Tensor(dc.scores()).unsqueeze(-1)
-        print(d_centralities)
+        # print(d_centralities)
 
+        # ???
         self.features = torch.cat((b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
-        x = 1
+        # x = 1
 
     def step(self, action: int):
         done = False
@@ -90,22 +110,27 @@ class NetworkEnvironment(Env):
         # gets random file name, loads graphs, returns state
         randomfilename = get_random_filename()
         nodes, edges = load_json(path.join(SAMPLEDIRECTORY, randomfilename))
-
+        self.nodes = nodes # Added nodes
+        self.edges = edges # Added edges
         # Create nx_graph
         nx_graph = make_nx_graph(nodes, edges)
         self.dgl_g = dgl.from_networkx(nx_graph)
         self.graph_size = len(nx_graph.nodes())
 
+        #Create a vector of zeros to the length of the graph_size
         self.edge_vector = [0 for _ in range(self.graph_size)]
 
+        #Create tuples index : pubKey into bidictionary
         self.index_to_node = bidict(enumerate(nx_graph.nodes()))
+        self.index_to_node = bidict(enumerate(nx_graph.nodes()))
+        #Assing network kit graph
         self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
 
         self.get_features()
 
         self.dgl_g.ndata['features'] = self.features
 
-        self.gcn = GCN(3, 4, 3, 2, F.relu)
+        self.gcn = GCN(self,3, 4, 3, 2, F.relu)
 
 
         if self.node_id is None:
@@ -123,5 +148,26 @@ class NetworkEnvironment(Env):
         return self.gcn(self.dgl_g), done
 
     # render on frame of environment at a time
+
+    #Given public ID number from a node
+    def get_edge_vector_from_node (self, pubKey :str):
+
+        source_target = []
+        edges_number = []
+        for edge in self.edges:
+            if edge[0] == pubKey:
+                source_target.append(edge[1])
+                inverse_edge = self.index_to_node.inverse[edge[1]]
+                edges_number.append(inverse_edge)
+                self.edge_vector[inverse_edge] = 1
+
+        return source_target, edges_number, self.edge_vector
+
+
+    def get_random_node_key(self):
+        self.nodes
+        random_key = random.choice(self.nodes)
+        return random_key
+
     def render(self, mode='channel'):
         pass

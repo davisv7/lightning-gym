@@ -6,16 +6,34 @@ from networkx import Graph as nx_Graph
 from networkit import Graph as nk_Graph
 from typing import Dict
 
+''' 
+    getcwd() returs the current working direcetory of a processs
+    SAMPLEDIRECTORY - get pathname where the file sample_snapshots
+    is located
+'''
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
 
-
+'''
+    listdir() - Return a list of all the files names inside a given directory
+    choice() - Returns  a random selected file name form the graphfilenames
+    ONLY GETS THE    FILE NAME NOT THE FILE
+'''
 def get_random_filename():
     graphfilenames = listdir(SAMPLEDIRECTORY)
     randomfilename = choice(graphfilenames)
     return randomfilename
 
-
+'''
+    Pass json_file and open file
+    Load the data (dictionary). It has two keys: nodes and links
+    The values is made up of dictionaries within dictionaries. 
+    For each node in nodes get the id and add them to single list.
+    For each edge (key) in links add elements of the edge in a tupple.
+    (source, target, dict- {'weight' : value }
+    NODES - List of ID's
+    EDGES - List of tuples
+'''
 def load_json(json_filename):
     with open(json_filename, 'r') as json_file:
         # Pass json data as dictionary
@@ -25,6 +43,12 @@ def load_json(json_filename):
     return nodes, edges
 
 
+'''
+    Pass nodes and edges
+    
+    For each node in nodes. Add node
+    Add edges: From => to and add weight
+'''
 def make_nx_graph(nodes, edges):
     nx_graph = nx.DiGraph()
     for node in nodes:
