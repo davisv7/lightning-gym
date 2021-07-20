@@ -73,7 +73,7 @@ class NetworkEnvironment(Env):
         update_values = torch.FloatTensor(self.edge_vector)
 
         self.features[rows, col_idx] = update_values
-        self.dgl_g.ndata["features"] = self.features
+        self.dgl_g.ndata["features"] = self.features #.ndta??
 
     def step(self, action: int):
         done = False
@@ -93,6 +93,7 @@ class NetworkEnvironment(Env):
             print(self.btwn_cent)
 
         info = {}
+
         return self.gcn.forward(self.dgl_g), torch.Tensor([reward]), done, info
 
     def get_illegal_actions(self):
@@ -189,3 +190,28 @@ class NetworkEnvironment(Env):
 
     def render(self, mode='channel'):
         pass
+
+    def ask_for_graph_length(self):
+
+        len_graph = input('How many nodes do you want in your subgraph')
+        if len_graph.strp().isdigit():
+            return len_graph
+        else:
+            print("Please enter a valid integer")
+            ask_for_graph_length()
+
+    def generate_subgraph(self):
+        # k = ask_for_graph_length()
+        k = 20
+        included_nodes = []
+        excluded_node = self.dgl_g.nodes()
+        # print(excluded_node)
+        # subgraph = None
+        # node = random.choice(excluded_node)
+        # excluded_node.pop(node)
+        # included_nodes.append(node)
+        # while len(subgraph) < k:
+        #     included_nodes.extend(node.ne)
+
+
+

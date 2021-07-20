@@ -64,16 +64,16 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
     :return: nk_graph: Networkit type graph
     :return: node_ids: mapping of indices to pub_keys, useless if generated graph
     """
-    ids_to_index = index_to_node.inverse
-    nk_graph = nk_Graph(weighted=True, directed=True)
+    ids_to_index = index_to_node.inverse  #Pass the bidict
+    nk_graph = nk_Graph(weighted=True, directed=True) #Intance of nk_graph
     # node_ids = bidict()
     # add nodes
-    for i, node in enumerate(nx_graph.nodes()):
+    for i, node in enumerate(nx_graph.nodes()): # n nodes into the nk_graph, ? i
         nk_graph.addNode()
         # node_ids[nx_graph.nodes()[node]["id"]] = i
     # add edges
     for u, v in nx_graph.edges():
-        nk_graph.addEdge(ids_to_index[u], ids_to_index[v])
+        nk_graph.addEdge(ids_to_index[u], ids_to_index[v]) #Souce and target
         nk_graph.setWeight(ids_to_index[u], ids_to_index[v], nx_graph[u][v]["weight"])
 
     return nk_graph

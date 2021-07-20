@@ -9,12 +9,14 @@ budget = 10
 node_id = None
 # Initial Budget
 env = NetworkEnvironment(budget=budget, node_id=node_id)  # Create class instance
-# env.reset()  # Why reset?
+env.reset()
 total_reward = 0
 
-agent = DiscreteActorCritic(env, cuda_flag=False, load_model=False)
-for i in range(1000):
-    log = agent.train()
+# env.generate_subgraph()
+#
+# agent = DiscreteActorCritic(env, cuda_flag=False, load_model=False)
+# for i in range(1000):
+#     log = agent.train()
 
 # obs = env.reset()
 # for i in range(budget):  # Iterate each int for our budget range

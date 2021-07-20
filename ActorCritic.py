@@ -45,23 +45,36 @@ class DiscreteActorCritic:
 
     def run_episode(self):
         done = False
-        state = self.problem.reset()
+        state = self.problem.reset() #We get our initial state by reseting
+        #Add our illegal acitons which are ones in the edge vector
         [illegal_actions, _] = self.problem.get_illegal_actions()
+        #Initialize the list below
         PI = torch.empty(0)
         R = torch.empty(0)
         V = torch.empty(0)
 
         while not done:
+            #Pull the graph
             G = self.problem.dgl_g
+
+            #If we have graphic card
             if self.cuda:
                 G.ndata['x'] = G.ndata['x'].cuda()
+
+            #We put it into our model
             [pi, val] = self.model(G)
 
             # get action from policy network
+
+            #Remove the dimmensions of size one
             pi = pi.squeeze()
+            #For all the indices that are illegal set the distribution to neg inf.
+            #No possible way they can be selected
             pi[illegal_actions] = -float('Inf')
             pi = F.softmax(pi, dim=0)
+            #Get the probabilty of action we can take
             dist = torch.distributions.categorical.Categorical(pi)
+            #Take the higher probabilty
             if self._test:
                 action = dist.probs.argmax()
             else:
@@ -72,9 +85,12 @@ class DiscreteActorCritic:
             [illegal_actions, _] = self.problem.get_illegal_actions()
             state = new_state
 
-            # collect outputs of networks for learning
+            # collect outputs of networks for learning - cat-> appending
+            # Probability for taking action
             PI = torch.cat([PI, pi[action].unsqueeze(0)], dim=0)
+            #The Reward we got
             R = torch.cat([R, reward.unsqueeze(0)], dim=0)
+            #The Value we thought it would be
             V = torch.cat([V, val.unsqueeze(0)], dim=0)
             # A = torch.cat([A, action.unsqueeze(0)], dim=0)
 
@@ -83,6 +99,7 @@ class DiscreteActorCritic:
         # self.log.add_item('gains',np.flip(R.numpy()))
 
         # discount past rewards
+        # Actions taken in the past has less to do in our actions in the future
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
 
@@ -102,6 +119,7 @@ class DiscreteActorCritic:
         # self.log.add_item('TD_error', L_value.detach().item())
         # self.log.add_item('entropy', L_entropy.cpu().detach().item())
 
+    #Run so many numbers of episode then run the model
     def train(self):
         [PI, R, V, _] = self.run_episode()
         for i in range(self.num_episodes - 1):
