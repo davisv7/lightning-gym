@@ -22,7 +22,7 @@ class DiscreteActorCritic:
 
         # hyperparameters
         self.in_feats = kwargs.get("ndim", 3)  # of node features - equal to length of x in BTWN.py
-        self.n_hidden = kwargs.get("hdim", 128)
+        self.n_hidden = kwargs.get("hdim", 256)
         self.gamma = kwargs.get("gamma", 1)
         self.learning_rate = kwargs.get("lr", 0.001)
         self.num_episodes = 1

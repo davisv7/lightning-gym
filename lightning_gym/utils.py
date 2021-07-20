@@ -72,10 +72,10 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
     :return: node_ids: mapping of indices to pub_keys, useless if generated graph
     """
     ids_to_index = index_to_node.inverse  # Pass the bidict
-    nk_graph = nk_Graph(weighted=True, directed=False)  # Intance of nk_graph
+    nk_graph = nk_Graph(weighted=True, directed=False)  # Instance of nk_graph
 
     # add nodes
-    for node in nx_graph.nodes():  # n nodes into the nk_graph, ? i
+    for node in nx_graph.nodes():  # n nodes into the nk_graph
         nk_graph.addNode()
 
     # add edges
@@ -84,10 +84,10 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
         if (v, u) in seen:
             continue
         else:
-            nk_graph.addEdge(ids_to_index[u], ids_to_index[v])  # Souce and target
+            nk_graph.addEdge(ids_to_index[u], ids_to_index[v])  # Source and target
             w1 = nx_graph[u][v]["weight"]
             w2 = nx_graph[v][u]["weight"]
-            fee = min(w1, w2)
+            fee = max(w1, w2)
             nk_graph.setWeight(ids_to_index[u], ids_to_index[v], fee)
             seen.append((u, v))
 

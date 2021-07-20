@@ -82,14 +82,13 @@ class NetworkEnvironment(Env):
 
     def step(self, action: int):
         done = False
-        # calculate reward
         if self.edge_vector[action] == 1:
             reward = 0
-            done = False
         else:
             # what if, by adding a node twice, we remove it? increase budget, reward is negative change
             # we would have to reinit the betweenness calculator on edge removals, which isn't terrible
             self.edge_vector[action] = 1
+            # calculate reward
             reward = self.get_reward(action)
             self.update_features()
 
@@ -140,7 +139,7 @@ class NetworkEnvironment(Env):
 
         if self.k is not None:
             self.nx_graph = self.generate_subgraph()
-            self.graph_size = len(self.nx_graph.nodes())
+            self.graph_size = self.k
 
         # Create tuples index : pubKey into bidictionary
         self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
@@ -152,7 +151,7 @@ class NetworkEnvironment(Env):
             self.node_index = self.graph_size
             self.graph_size += 1
 
-        self.dgl_g = dgl.from_networkx(self.nx_graph).add_self_loop()
+        self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
 
         self.budget_offset = 0
         self.get_edge_vector_from_node()
@@ -195,12 +194,11 @@ class NetworkEnvironment(Env):
 
         included_nodes = set()
         excluded_nodes = set(self.nx_graph.nodes())
-        unexplored_neighbors = set()
+        unexplored_neighbors = set() #empty set of unexplored neighbors
 
         node = random.choice(list(excluded_nodes)) #Take a random node to start BFS
         excluded_nodes.difference_update([node]) #Take node from non-explored
         included_nodes.add(node)  #Add node in visited nodes
-        unexplored_neighbors=set() #empty set of unexplored neighbors
         while len(included_nodes) < self.k:
             neighbors = list(self.nx_graph.neighbors(node)) #Get all the neighbors from the node
             shuffle(neighbors) #Make the nodes random
@@ -214,3 +212,6 @@ class NetworkEnvironment(Env):
             node = random.choice(list(unexplored_neighbors))#Choose a random node from unexplored neighbors
             unexplored_neighbors.difference_update([node]) #Remove that node from unexplored
         return nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))
+
+    def random_scale_free(self):
+        return nx.scale_free_graph(self.k, 0.8, 0.1, 0.1).to_undirected()
