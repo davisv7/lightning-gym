@@ -21,8 +21,8 @@ class GCN(nn.Module):
                  ):
         super(GCN, self).__init__()
 
-        #Why Policy and value
-        self.policy = nn.Linear(n_classes, 1) #We know is the output of the GCNN
+        # Why Policy and value
+        self.policy = nn.Linear(n_classes, 1)  # We know is the output of the GCNN
         self.value = nn.Linear(n_classes, 1, )
         self.layers = nn.ModuleList()  # Create empty list of layers
         # input layer
@@ -40,16 +40,14 @@ class GCN(nn.Module):
         features pass to j
         b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1
         '''
-        h = g.ndata['features'] #Get features
+        h = g.ndata['features']  # Get features
         for i, layer in enumerate(self.layers):
             # if i != 0:
             #     h = self.dropout(h)
-            h = layer(g, h) #Features after they been convoluted
+            h = layer(g, h)  # Features after they been convoluted
         g.ndata['h'] = h
-        mN = readout_nodes(g, 'h') #Sum of those three features
-        PI = self.policy(h)       #Distribution of actions
+        mN = readout_nodes(g, 'h', op="min")  # Sum of those three features
+        PI = self.policy(h)  # Distribution of actions
         V = self.value(mN)
         g.ndata.pop('h')
-        return PI, V #Use it in the run episod method
-
-
+        return PI, V  # Use it in the run episod method

@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 import random
 from ..Logger import Logger
-from random import sample,shuffle
+from random import sample, shuffle
 
 '''
     Get the current directory.
@@ -38,7 +38,6 @@ class NetworkEnvironment(Env):
         self.graph_size = None
         self.dyn_btwn_getter = None
         self.btwn_cent = 0  # Betweenness
-        self.gcn = None
         self.edge_vector = None
         self.features = None
         self.nodes = None
@@ -59,7 +58,7 @@ class NetworkEnvironment(Env):
         could have considerable more influence.
         '''
 
-        bc = nk.centrality.Betweenness(self.nk_g, )  # Pa
+        bc = nk.centrality.Betweenness(self.nk_g, normalized=True)  # Pa
         bc.run()  # Run the algorithm
         b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)
         '''Initialize Algorithm
@@ -71,6 +70,7 @@ class NetworkEnvironment(Env):
         d_centralities = torch.Tensor(dc.scores()).unsqueeze(-1)
 
         self.features = torch.cat((b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
+        self.dgl_g.ndata['features'] = self.features
 
     def update_features(self):
         col_idx = torch.Tensor(np.repeat(-1, self.features.size(0))).long()
@@ -78,7 +78,7 @@ class NetworkEnvironment(Env):
         update_values = torch.FloatTensor(self.edge_vector)
 
         self.features[rows, col_idx] = update_values
-        self.dgl_g.ndata["features"] = self.features  # .ndta??
+        self.dgl_g.ndata['features'] = self.features  # .ndta??
 
     def step(self, action: int):
         done = False
@@ -91,6 +91,7 @@ class NetworkEnvironment(Env):
             # we would have to reinit the betweenness calculator on edge removals, which isn't terrible
             self.edge_vector[action] = 1
             reward = self.get_reward(action)
+            self.update_features()
 
         # check if done with budget
         if sum(self.edge_vector) == self.budget + self.budget_offset:
@@ -100,7 +101,7 @@ class NetworkEnvironment(Env):
 
         info = {}
 
-        return self.gcn.forward(self.dgl_g), torch.Tensor([reward]), done, info
+        return self.dgl_g, torch.Tensor([reward]), done, info
 
     def get_illegal_actions(self):
         illegal = (self.edge_vector == 1.).nonzero()
@@ -135,16 +136,23 @@ class NetworkEnvironment(Env):
         self.edges = edges  # Added edges
         # Create nx_graph
         self.nx_graph = make_nx_graph(nodes, edges)
+        self.graph_size = len(self.nx_graph.nodes())
 
         if self.k is not None:
-            self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
             self.nx_graph = self.generate_subgraph()
-
-        self.dgl_g = dgl.from_networkx(self.nx_graph)
-        self.graph_size = len(self.nx_graph.nodes())
+            self.graph_size = len(self.nx_graph.nodes())
 
         # Create tuples index : pubKey into bidictionary
         self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
+
+        if self.node_id is not None:
+            self.node_index = self.index_to_node.inverse[self.node_id]
+        else:
+            self.nx_graph.add_node("")
+            self.node_index = self.graph_size
+            self.graph_size += 1
+
+        self.dgl_g = dgl.from_networkx(self.nx_graph).add_self_loop()
 
         self.budget_offset = 0
         self.get_edge_vector_from_node()
@@ -153,30 +161,11 @@ class NetworkEnvironment(Env):
 
         self.get_features()
 
-        self.dgl_g.ndata['features'] = self.features
-
-        self.gcn = GCN(
-            in_feats=3,
-            n_hidden=4,
-            n_classes=1,
-            n_layers=1,
-            activation=F.relu)
-
-        if self.node_id is None:
-            # self.index_to_node[self.graph_size] = self.node_id
-            self.node_index = self.graph_size
-            self.nk_g.addNode()
-
-        else:
-            self.node_index = self.index_to_node.inverse[self.node_id]
-
         self.dyn_btwn_getter = nk.centrality.DynBetweennessOneNode(self.nk_g, self.node_index)
         self.dyn_btwn_getter.run()
         self.btwn_cent = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
 
-        obs = self.gcn.forward(self.dgl_g)
-
-        return obs
+        return self.dgl_g
 
     # render on frame of environment at a time
 
@@ -201,38 +190,27 @@ class NetworkEnvironment(Env):
     def render(self, mode='channel'):
         pass
 
-    def ask_for_graph_length(self):
-
-        len_graph = input('How many nodes do you want in your subgraph')
-        if len_graph.strp().isdigit():
-            return len_graph
-        else:
-            print("Please enter a valid integer")
-            ask_for_graph_length()
-
     def generate_subgraph(self):
         assert self.k < len(self.nx_graph), 'k needs to be smaller than the graph size'
-        # k = ask_for_graph_length()
+
         included_nodes = set()
         excluded_nodes = set(self.nx_graph.nodes())
-        # print(excluded_node)
-        # subgraph = None
+        unexplored_neighbors = set()
+
         node = random.choice(list(excluded_nodes)) #Take a random node to start BFS
-        excluded_nodes.difference_update([self.index_to_node.inverse[node]]) #Take node from non-explored
+        excluded_nodes.difference_update([node]) #Take node from non-explored
         included_nodes.add(node)  #Add node in visited nodes
         unexplored_neighbors=set() #empty set of unexplored neighbors
         while len(included_nodes) < self.k:
             neighbors = list(self.nx_graph.neighbors(node)) #Get all the neighbors from the node
             shuffle(neighbors) #Make the nodes random
+            # shorten neighbors so that subgraph stays below k
             cutoff = min(self.k-len(included_nodes),len(neighbors)) #If enough space we will add n if not until is filled
             neighbors=set(neighbors[:cutoff]) #Get the nodes up to
-            #shorten neighbors so that subgraph stays below k
+
             unexplored_neighbors=unexplored_neighbors.union(neighbors-included_nodes) #If we had a cutoff get uexplored neighbors
             included_nodes = included_nodes.union(neighbors) #Add return n into included nodes
             excluded_nodes.difference_update(neighbors)  #Take out the neighbors
-            # [excluded_node.remove(x) for x in neighbors if x in excluded_node]
             node = random.choice(list(unexplored_neighbors))#Choose a random node from unexplored neighbors
             unexplored_neighbors.difference_update([node]) #Remove that node from unexplored
-        # included_nodes = [self.index_to_node.inverse[node] for node in included_nodes]
-        print("Generated graph of size: {}".format(len(included_nodes))) #Print size of created graph
-        return nx.subgraph(self.nx_graph, included_nodes)
+        return nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))

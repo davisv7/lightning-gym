@@ -19,10 +19,13 @@ SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
     choice() - Returns  a random selected file name form the graphfilenames
     ONLY GETS THE    FILE NAME NOT THE FILE
 '''
+
+
 def get_random_filename():
     graphfilenames = listdir(SAMPLEDIRECTORY)
     randomfilename = choice(graphfilenames)
     return randomfilename
+
 
 '''
     Pass json_file and open file
@@ -34,6 +37,8 @@ def get_random_filename():
     NODES - List of ID's
     EDGES - List of tuples
 '''
+
+
 def load_json(json_filename):
     with open(json_filename, 'r') as json_file:
         # Pass json data as dictionary
@@ -49,6 +54,8 @@ def load_json(json_filename):
     For each node in nodes. Add node
     Add edges: From => to and add weight
 '''
+
+
 def make_nx_graph(nodes, edges):
     nx_graph = nx.DiGraph()
     for node in nodes:
@@ -64,24 +71,24 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
     :return: nk_graph: Networkit type graph
     :return: node_ids: mapping of indices to pub_keys, useless if generated graph
     """
-    ids_to_index = index_to_node.inverse  #Pass the bidict
-    nk_graph = nk_Graph(weighted=True, directed=False) #Intance of nk_graph
-    # node_ids = bidict()
+    ids_to_index = index_to_node.inverse  # Pass the bidict
+    nk_graph = nk_Graph(weighted=True, directed=False)  # Intance of nk_graph
+
     # add nodes
-    for i, node in enumerate(nx_graph.nodes()): # n nodes into the nk_graph, ? i
+    for node in nx_graph.nodes():  # n nodes into the nk_graph, ? i
         nk_graph.addNode()
-        # node_ids[nx_graph.nodes()[node]["id"]] = i
+
     # add edges
     seen = []
     for u, v in nx_graph.edges():
-        if (v,u) in seen:
+        if (v, u) in seen:
             continue
         else:
-            nk_graph.addEdge(ids_to_index[u], ids_to_index[v]) #Souce and target
+            nk_graph.addEdge(ids_to_index[u], ids_to_index[v])  # Souce and target
             w1 = nx_graph[u][v]["weight"]
             w2 = nx_graph[v][u]["weight"]
-            fee = max(w1,w2)
+            fee = min(w1, w2)
             nk_graph.setWeight(ids_to_index[u], ids_to_index[v], fee)
-            seen.append((u,v))
+            seen.append((u, v))
 
     return nk_graph

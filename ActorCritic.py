@@ -29,7 +29,7 @@ class DiscreteActorCritic:
         self._test = kwargs.get("test", False)
 
         # create the model for the agent
-        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=2, activation=F.rrelu)
+        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
         if self._load_model:
             self.load_model()
         if cuda_flag:
@@ -55,11 +55,11 @@ class DiscreteActorCritic:
 
         while not done:
             #Pull the graph
-            G = self.problem.dgl_g
+            G =state
 
             #If we have graphic card
             if self.cuda:
-                G.ndata['x'] = G.ndata['x'].cuda()
+                G.ndata['features'] = G.ndata['features'].cuda()
 
             #We put it into our model
             [pi, val] = self.model(G)
