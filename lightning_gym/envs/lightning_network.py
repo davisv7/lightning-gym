@@ -10,6 +10,8 @@ import torch
 import torch.nn.functional as F
 import random
 from ..Logger import Logger
+from random import sample
+
 
 '''
     Get the current directory.
@@ -35,7 +37,7 @@ class NetworkEnvironment(Env):
         self.dgl_g = None  # Make DGL graph
         self.graph_size = None
         self.dyn_btwn_getter = None
-        self.btwn_cent = 0  # Betweens
+        self.btwn_cent = 0  # Betweenness
         self.gcn = None
         self.edge_vector = None
         self.features = None
@@ -44,6 +46,7 @@ class NetworkEnvironment(Env):
         self.r_logger = Logger()
         self.repeat = True
         self.budget_offset = 0
+        self.nx_graph = None
 
     def get_features(self):
 
@@ -128,18 +131,18 @@ class NetworkEnvironment(Env):
         self.nodes = nodes  # Added nodes
         self.edges = edges  # Added edges
         # Create nx_graph
-        nx_graph = make_nx_graph(nodes, edges)
-        self.dgl_g = dgl.from_networkx(nx_graph)
-        self.graph_size = len(nx_graph.nodes())
+        self.nx_graph = make_nx_graph(nodes, edges)
+        self.dgl_g = dgl.from_networkx(self.nx_graph)
+        self.graph_size = len(self.nx_graph.nodes())
 
         # Create tuples index : pubKey into bidictionary
-        self.index_to_node = bidict(enumerate(nx_graph.nodes()))
-        self.index_to_node = bidict(enumerate(nx_graph.nodes()))
+        self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
+        self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
 
         self.budget_offset = 0
         self.get_edge_vector_from_node()
         # Passing network kit graph
-        self.nk_g = nx_to_nk(nx_graph, self.index_to_node)
+        self.nk_g = nx_to_nk(self.nx_graph, self.index_to_node)
 
         self.get_features()
 
@@ -201,17 +204,24 @@ class NetworkEnvironment(Env):
             ask_for_graph_length()
 
     def generate_subgraph(self):
-        # k = ask_for_graph_length()
         k = 20
+        assert k < self.graph_size, 'k needs to be smaller than the graph size'
+        # k = ask_for_graph_length()
         included_nodes = []
-        excluded_node = self.dgl_g.nodes()
+        excluded_node = list(self.nx_graph.nodes())
         # print(excluded_node)
         # subgraph = None
-        # node = random.choice(excluded_node)
-        # excluded_node.pop(node)
-        # included_nodes.append(node)
-        # while len(subgraph) < k:
-        #     included_nodes.extend(node.ne)
+        node = random.choice(excluded_node)
+        excluded_node.pop(self.index_to_node.inverse[node])
+        included_nodes.append(node)
+        while len(included_nodes) < k:
+            neighbors = list(self.nx_graph.neighbors(node))
+            included_nodes.extend(neighbors)
+            [excluded_node.remove(x) for x in neighbors if x in excluded_node]
+            node = random.choice(neighbors)
+        included_nodes = [self.index_to_node.inverse[node] for node in included_nodes]
+        return dgl.node_subgraph(self.dgl_g, included_nodes)
+
 
 
 

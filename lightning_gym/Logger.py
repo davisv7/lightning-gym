@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 
-class Logger():
+
+class Logger:
     def __init__(self):
         self.log = []
         self.plot_reward = None
@@ -9,6 +10,6 @@ class Logger():
         self.log.append(reward)
 
     def plot_logger(self):
-        y = len(self.log)
+        # y = len(self.log)
         plt.plot(self.log)
         plt.show()

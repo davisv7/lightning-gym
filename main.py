@@ -12,7 +12,8 @@ env = NetworkEnvironment(budget=budget, node_id=node_id)  # Create class instanc
 env.reset()
 total_reward = 0
 
-# env.generate_subgraph()
+env.generate_subgraph()
+
 #
 # agent = DiscreteActorCritic(env, cuda_flag=False, load_model=False)
 # for i in range(1000):
