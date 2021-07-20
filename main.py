@@ -8,16 +8,25 @@ budget = 10
 # node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
 node_id = None
 # Initial Budget
-env = NetworkEnvironment(budget=budget, node_id=node_id)  # Create class instance
-env.reset()
+
 total_reward = 0
 
-env.generate_subgraph()
+for i in range(5, 11):
+    k = 2 ** i
+    params = {
+        "k": k
+    }
+    env = NetworkEnvironment(budget=budget, node_id=node_id, kwargs=params)  # Create class instance
+    env.reset()
+    agent = DiscreteActorCritic(env, cuda_flag=False, load_model=True)
 
-#
-# agent = DiscreteActorCritic(env, cuda_flag=False, load_model=False)
-# for i in range(1000):
-#     log = agent.train()
+
+    for i in range(1000):
+        log = agent.train()
+
+    agent.save_model()
+    print()
+
 
 # obs = env.reset()
 # for i in range(budget):  # Iterate each int for our budget range

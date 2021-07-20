@@ -1,3 +1,4 @@
+import networkx as nx
 from gym import Env, logger, spaces
 from gym.spaces import Discrete, Box
 import numpy as np
@@ -10,8 +11,7 @@ import torch
 import torch.nn.functional as F
 import random
 from ..Logger import Logger
-from random import sample
-
+from random import sample,shuffle
 
 '''
     Get the current directory.
@@ -25,7 +25,7 @@ SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
 # Environment Class
 class NetworkEnvironment(Env):
 
-    def __init__(self, budget=10, node_id=None):
+    def __init__(self, budget=10, node_id=None, kwargs=None):
         """
         :param budget:
         """
@@ -47,6 +47,8 @@ class NetworkEnvironment(Env):
         self.repeat = True
         self.budget_offset = 0
         self.nx_graph = None
+        self.params = kwargs
+        self.k = kwargs.get("k", None)
 
     def get_features(self):
 
@@ -76,14 +78,14 @@ class NetworkEnvironment(Env):
         update_values = torch.FloatTensor(self.edge_vector)
 
         self.features[rows, col_idx] = update_values
-        self.dgl_g.ndata["features"] = self.features #.ndta??
+        self.dgl_g.ndata["features"] = self.features  # .ndta??
 
     def step(self, action: int):
         done = False
         # calculate reward
         if self.edge_vector[action] == 1:
             reward = 0
-            done = True
+            done = False
         else:
             # what if, by adding a node twice, we remove it? increase budget, reward is negative change
             # we would have to reinit the betweenness calculator on edge removals, which isn't terrible
@@ -93,7 +95,7 @@ class NetworkEnvironment(Env):
         # check if done with budget
         if sum(self.edge_vector) == self.budget + self.budget_offset:
             done = True
-            print(self.btwn_cent)
+            print("{:.4f}".format(self.btwn_cent))
 
         info = {}
 
@@ -113,10 +115,10 @@ class NetworkEnvironment(Env):
         event = nk.dynamic.GraphEvent(event_type, self.node_index, neighbor_index, 1)
         self.dyn_btwn_getter.update(event)
 
-        # and another in the other direction
-        self.nk_g.addEdge(neighbor_index, self.node_index, w=1)
-        event = nk.dynamic.GraphEvent(event_type, neighbor_index, self.node_index, 1)
-        self.dyn_btwn_getter.update(event)
+        # # and another in the other direction
+        # self.nk_g.addEdge(neighbor_index, self.node_index, w=1)
+        # event = nk.dynamic.GraphEvent(event_type, neighbor_index, self.node_index, 1)
+        # self.dyn_btwn_getter.update(event)
         new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
         reward = new_btwn - self.btwn_cent
         # Adding reward to logger
@@ -132,11 +134,15 @@ class NetworkEnvironment(Env):
         self.edges = edges  # Added edges
         # Create nx_graph
         self.nx_graph = make_nx_graph(nodes, edges)
+
+        if self.k is not None:
+            self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
+            self.nx_graph = self.generate_subgraph()
+
         self.dgl_g = dgl.from_networkx(self.nx_graph)
         self.graph_size = len(self.nx_graph.nodes())
 
         # Create tuples index : pubKey into bidictionary
-        self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
         self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
 
         self.budget_offset = 0
@@ -165,7 +171,7 @@ class NetworkEnvironment(Env):
 
         self.dyn_btwn_getter = nk.centrality.DynBetweennessOneNode(self.nk_g, self.node_index)
         self.dyn_btwn_getter.run()
-        self.btwn_cent = self.dyn_btwn_getter.getbcx() / ((self.graph_size - 1) * (self.graph_size - 2) / 2)
+        self.btwn_cent = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
 
         obs = self.gcn.forward(self.dgl_g)
 
@@ -204,24 +210,28 @@ class NetworkEnvironment(Env):
             ask_for_graph_length()
 
     def generate_subgraph(self):
-        k = 20
-        assert k < self.graph_size, 'k needs to be smaller than the graph size'
+        assert self.k < len(self.nx_graph), 'k needs to be smaller than the graph size'
         # k = ask_for_graph_length()
-        included_nodes = []
-        excluded_node = list(self.nx_graph.nodes())
+        included_nodes = set()
+        excluded_nodes = set(self.nx_graph.nodes())
         # print(excluded_node)
         # subgraph = None
-        node = random.choice(excluded_node)
-        excluded_node.pop(self.index_to_node.inverse[node])
-        included_nodes.append(node)
-        while len(included_nodes) < k:
+        node = random.choice(list(excluded_nodes))
+        excluded_nodes.difference_update([self.index_to_node.inverse[node]])
+        included_nodes.add(node)
+        unexplored_neighbors=set()
+        while len(included_nodes) < self.k:
             neighbors = list(self.nx_graph.neighbors(node))
-            included_nodes.extend(neighbors)
-            [excluded_node.remove(x) for x in neighbors if x in excluded_node]
-            node = random.choice(neighbors)
-        included_nodes = [self.index_to_node.inverse[node] for node in included_nodes]
-        return dgl.node_subgraph(self.dgl_g, included_nodes)
-
-
-
-
+            shuffle(neighbors)
+            cutoff = min(self.k-len(included_nodes),len(neighbors))
+            neighbors=set(neighbors[:cutoff])
+            #shorten neighbors so that subgraph stays below k
+            unexplored_neighbors=unexplored_neighbors.union(neighbors-included_nodes)
+            included_nodes = included_nodes.union(neighbors)
+            excluded_nodes.difference_update(neighbors)
+            # [excluded_node.remove(x) for x in neighbors if x in excluded_node]
+            node = random.choice(list(unexplored_neighbors))
+            unexplored_neighbors.difference_update([node])
+        # included_nodes = [self.index_to_node.inverse[node] for node in included_nodes]
+        print("Generated graph of size: {}".format(len(included_nodes)))
+        return nx.subgraph(self.nx_graph, included_nodes)
