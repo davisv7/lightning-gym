@@ -95,6 +95,7 @@ class NetworkEnvironment(Env):
         # check if done with budget
         if sum(self.edge_vector) == self.budget + self.budget_offset:
             done = True
+            self.r_logger.add_logger(self.btwn_cent)
             print("{:.4f}".format(self.btwn_cent))
 
         info = {}
@@ -122,7 +123,7 @@ class NetworkEnvironment(Env):
         new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
         reward = new_btwn - self.btwn_cent
         # Adding reward to logger
-        self.r_logger.add_logger(reward)
+        # self.r_logger.add_logger(reward)
         self.btwn_cent = new_btwn
         return reward
 
@@ -216,22 +217,22 @@ class NetworkEnvironment(Env):
         excluded_nodes = set(self.nx_graph.nodes())
         # print(excluded_node)
         # subgraph = None
-        node = random.choice(list(excluded_nodes))
-        excluded_nodes.difference_update([self.index_to_node.inverse[node]])
-        included_nodes.add(node)
-        unexplored_neighbors=set()
+        node = random.choice(list(excluded_nodes)) #Take a random node to start BFS
+        excluded_nodes.difference_update([self.index_to_node.inverse[node]]) #Take node from non-explored
+        included_nodes.add(node)  #Add node in visited nodes
+        unexplored_neighbors=set() #empty set of unexplored neighbors
         while len(included_nodes) < self.k:
-            neighbors = list(self.nx_graph.neighbors(node))
-            shuffle(neighbors)
-            cutoff = min(self.k-len(included_nodes),len(neighbors))
-            neighbors=set(neighbors[:cutoff])
+            neighbors = list(self.nx_graph.neighbors(node)) #Get all the neighbors from the node
+            shuffle(neighbors) #Make the nodes random
+            cutoff = min(self.k-len(included_nodes),len(neighbors)) #If enough space we will add n if not until is filled
+            neighbors=set(neighbors[:cutoff]) #Get the nodes up to
             #shorten neighbors so that subgraph stays below k
-            unexplored_neighbors=unexplored_neighbors.union(neighbors-included_nodes)
-            included_nodes = included_nodes.union(neighbors)
-            excluded_nodes.difference_update(neighbors)
+            unexplored_neighbors=unexplored_neighbors.union(neighbors-included_nodes) #If we had a cutoff get uexplored neighbors
+            included_nodes = included_nodes.union(neighbors) #Add return n into included nodes
+            excluded_nodes.difference_update(neighbors)  #Take out the neighbors
             # [excluded_node.remove(x) for x in neighbors if x in excluded_node]
-            node = random.choice(list(unexplored_neighbors))
-            unexplored_neighbors.difference_update([node])
+            node = random.choice(list(unexplored_neighbors))#Choose a random node from unexplored neighbors
+            unexplored_neighbors.difference_update([node]) #Remove that node from unexplored
         # included_nodes = [self.index_to_node.inverse[node] for node in included_nodes]
-        print("Generated graph of size: {}".format(len(included_nodes)))
+        print("Generated graph of size: {}".format(len(included_nodes))) #Print size of created graph
         return nx.subgraph(self.nx_graph, included_nodes)

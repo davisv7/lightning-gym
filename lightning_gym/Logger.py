@@ -11,5 +11,7 @@ class Logger:
 
     def plot_logger(self):
         # y = len(self.log)
-        plt.plot(self.log)
+        X = [*range(0, len(self.log))]
+        plt.plot(X, self.log)
+        print('here')
         plt.show()

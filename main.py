@@ -2,6 +2,7 @@ from lightning_gym.envs.lightning_network import NetworkEnvironment
 import warnings
 from ActorCritic import DiscreteActorCritic
 
+
 warnings.filterwarnings("ignore")
 
 budget = 10
@@ -11,21 +12,23 @@ node_id = None
 
 total_reward = 0
 
-for i in range(5, 11):
+for i in range(5, 6):
     k = 2 ** i
     params = {
         "k": k
     }
     env = NetworkEnvironment(budget=budget, node_id=node_id, kwargs=params)  # Create class instance
     env.reset()
-    agent = DiscreteActorCritic(env, cuda_flag=False, load_model=True)
-
-
-    for i in range(1000):
+    agent = DiscreteActorCritic(env, cuda_flag=False, load_model=False)
+    for i in range(10):
         log = agent.train()
+        # agent.save_model()
 
-    agent.save_model()
-    print()
+print(env.r_logger.log)
+env.r_logger.plot_logger()
+    #
+    # agent.save_model()
+    # print()
 
 
 # obs = env.reset()
