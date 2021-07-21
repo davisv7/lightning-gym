@@ -13,6 +13,7 @@ import random
 from ..Logger import Logger
 from random import sample, shuffle
 from copy import deepcopy
+
 '''
     Get the current directory.
     Join the current directory with the name of file. Sample_Snapshots
@@ -66,6 +67,10 @@ class NetworkEnvironment(Env):
         self.k = kwargs.get("k", None)
         self.repeat = kwargs.get("repeat", False)
         self.base_graph = None
+        self.graph_type = kwargs.get('graph_type', 'sub_graph')
+        assert self.graph_type in ['sub_graph', 'snapshot', 'scale_free'], 'You must use one of the following graph ' \
+                                                                           'types, ' \
+                                                                           'sub_graph, snapshot, or scale_free.'
 
     def get_features(self):
 
@@ -158,17 +163,21 @@ class NetworkEnvironment(Env):
             self.nx_graph = deepcopy(self.base_graph)
             pass
         else:
-            # make random graph
-            randomfilename = get_random_filename()
-            nodes, edges = load_json(path.join(SAMPLEDIRECTORY, randomfilename))
-            self.nodes = nodes  # Added nodes
-            self.edges = edges  # Added edges
-            # Create nx_graph
-            self.nx_graph = make_nx_graph(nodes, edges)
-            self.graph_size = len(self.nx_graph.nodes())
-            if self.k is not None:  # if want subgraph, generate subgraph
+            if self.graph_type == 'snapshot':
+                self.get_random_snapshot()
+
+            elif self.graph_type == 'sub_graph':
+                self.get_random_snapshot()
                 self.nx_graph = self.generate_subgraph()
-                self.graph_size = self.k
+                self.nx_graph.add_node("")
+
+            elif self.graph_type == 'scale_free':
+                self.random_scale_free()
+                self.nx_graph.add_node(self.k)
+
+
+            self.graph_size = len(self.nx_graph.nodes())
+
 
             # Create bidictionary = tuple index: pubKey
             self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
@@ -177,9 +186,12 @@ class NetworkEnvironment(Env):
             if self.node_id is not None:
                 self.node_index = self.index_to_node.inverse[self.node_id]
             else:  # ??????????????
-                self.nx_graph.add_node("")
-                self.node_index = self.graph_size
-                self.graph_size += 1
+                if self.graph_type == 'snapshot':
+                    self.nx_graph.add_node("")
+                    self.graph_size = len(self.nx_graph.nodes())
+
+                self.node_index = self.graph_size-1
+                # self.graph_size += 1
             if self.repeat:
                 self.base_graph = deepcopy(self.nx_graph)
 
@@ -202,6 +214,15 @@ class NetworkEnvironment(Env):
         self.btwn_cent = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
 
         return self.dgl_g
+
+    def get_random_snapshot(self):
+        # make random graph
+        randomfilename = get_random_filename()
+        nodes, edges = load_json(path.join(SAMPLEDIRECTORY, randomfilename))
+        self.nodes = nodes  # Added nodes
+        self.edges = edges  # Added edges
+        # Create nx_graph
+        self.nx_graph = make_nx_graph(nodes, edges)
 
     # render on frame of environment at a time
 
@@ -252,4 +273,4 @@ class NetworkEnvironment(Env):
         return nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))  # return networkx graph
 
     def random_scale_free(self):  # ?????????????????
-        return nx.scale_free_graph(self.k, 0.8, 0.1, 0.1).to_undirected()
+        self.nx_graph = nx.scale_free_graph(self.k, 0.8, 0.1, 0.1).to_undirected()

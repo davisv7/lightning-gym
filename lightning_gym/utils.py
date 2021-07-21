@@ -85,8 +85,8 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
             continue
         else:
             nk_graph.addEdge(ids_to_index[u], ids_to_index[v])  # Source and target
-            w1 = nx_graph[u][v]["weight"]
-            w2 = nx_graph[v][u]["weight"]
+            w1 = nx_graph[u][v].get('weight', 1)
+            w2 = nx_graph[v][u].get('weight', 1)
             fee = max(w1, w2)
             nk_graph.setWeight(ids_to_index[u], ids_to_index[v], fee)
             seen.append((u, v))
