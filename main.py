@@ -12,7 +12,7 @@ def train_upwards():
     # Initial Budget
 
     total_reward = 0
-    num_episodes = 1000
+    num_episodes = 10 # Change this back to 10k
     load_model = False
     for power in range(6, 7):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
@@ -37,7 +37,7 @@ def train_upwards():
         ajay.save_model()  # save model to reuse and continue to improve on it
         print()
 
-    print(env.r_logger.log)
+    print(env.r_logger.log['tot_reward'])
     env.r_logger.plot_logger()
 
 

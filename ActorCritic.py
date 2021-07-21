@@ -30,7 +30,7 @@ class DiscreteActorCritic:
         #reward gradients out from goal
         #what it is saying: every decision is equal, once found path- it is =1, dont have distance
         #if have gamma less than 1, leaves out'''
-        self.learning_rate = kwargs.get("lr", 0.0001)
+        self.learning_rate = kwargs.get("lr", 0.001)
         self.num_episodes = 1 #is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
@@ -45,7 +45,7 @@ class DiscreteActorCritic:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         # logs information about trials/networks
-        # self.log = logger()
+        #self.log = logger()
         # self.log.add_log('tot_return')
         # self.log.add_log('TD_error')
         # self.log.add_log('entropy')

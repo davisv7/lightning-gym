@@ -81,7 +81,7 @@ class NetworkEnvironment(Env):
         could have considerable more influence.
         '''
 
-        bc = nk.centrality.Betweenness(self.nk_g, normalized=True)  # sets algroithm to find betweeness centrality
+        bc = nk.centrality.Betweenness(self.nk_g, normalized=True)  # sets algorithm to find betweeness centrality
         bc.run()  # Run the algorithm
         b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)  # makes list smaller size
         '''Initialize Algorithm
@@ -107,7 +107,7 @@ class NetworkEnvironment(Env):
 
     def step(self, action: int):  # make action and give reward
         done = False
-        if self.edge_vector[action] == 1:  # if find neighbor = no reward (dont need node)
+        if self.edge_vector[action] == 1:  # if find neighbor = no reward (don't need node)
             reward = 0
         else:
 
@@ -122,7 +122,7 @@ class NetworkEnvironment(Env):
 
         if sum(self.edge_vector) == self.budget + self.budget_offset:
             done = True
-            self.r_logger.add_logger(self.btwn_cent)  # check if exceeded budget
+            self.r_logger.add_log('tot_reward',self.btwn_cent)  # check if exceeded budget
             print("{:.4f}".format(self.btwn_cent))
 
         info = {}
@@ -140,7 +140,7 @@ class NetworkEnvironment(Env):
 
         # add an edge in one direction
         self.nk_g.addEdge(self.node_index, neighbor_index, w=1)  # making action node our neighbor
-        event = nk.dynamic.GraphEvent(event_type, self.node_index, neighbor_index, 1)  # Somthing happeds to the graph
+        event = nk.dynamic.GraphEvent(event_type, self.node_index, neighbor_index, 1)  # Something happends to the graph
         self.dyn_btwn_getter.update(event)  # degree centrality
 
         # # and another in the other direction
@@ -244,8 +244,8 @@ class NetworkEnvironment(Env):
         random_key = random.choice(self.nodes)
         return random_key
 
-    def render(self, mode='channel'):
-        pass
+    # def render(self, mode='channel'):
+    #     pass
 
     def generate_subgraph(self):
         assert self.k < len(self.nx_graph), 'k needs to be smaller than the graph size'
