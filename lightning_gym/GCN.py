@@ -10,38 +10,38 @@ from dgl.nn.pytorch import GraphConv
 from dgl import readout_nodes
 
 
-class GCN(nn.Module):
+class GCN(nn.Module): #create GCN class
     def __init__(self,
                  in_feats,  # Number of features each node has
                  n_hidden,  # Size of Hidden Features (Neighbors features)
                  n_classes,  # Size of final features vector
-                 n_layers,  # Number fo layers
+                 n_layers,  # Number of layers
                  activation  # Activation layer Relu in our case
                  # dropout
                  ):
         super(GCN, self).__init__()
 
         # Why Policy and value
-        self.policy = nn.Linear(n_classes, 1)  # We know is the output of the GCNN
-        self.value = nn.Linear(n_classes, 1, )
+        self.policy = nn.Linear(n_classes, 1)  # We know is the output of the GCN
+        self.value = nn.Linear(n_classes, 1, ) #Output?
         self.layers = nn.ModuleList()  # Create empty list of layers
         # input layer
         self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
         # hidden layers
-        for i in range(n_layers - 1):
+        for i in range(n_layers - 1): #representation of neighbors
             self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
         # output layer
-        self.layers.append(GraphConv(n_hidden, n_classes))
+        self.layers.append(GraphConv(n_hidden, n_classes)) #making x by x hidden layer
         # self.dropout = nn.Dropout(p=dropout)
 
     # self.gcn.forward(self.dgl_g), torch.Tensor([reward])
-    def forward(self, g):
+    def forward(self, g): #??????
         '''
         features pass to j
         b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1
         '''
-        h = g.ndata['features']  # Get features
-        for i, layer in enumerate(self.layers):
+        h = g.ndata['features']  # Get features from graph
+        for i, layer in enumerate(self.layers): #
             # if i != 0:
             #     h = self.dropout(h)
             h = layer(g, h)  # Features after they been convoluted
