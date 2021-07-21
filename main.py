@@ -12,24 +12,26 @@ node_id = None
 
 total_reward = 0
 
-for i in range(5, 6): #creating i amount of subgraphs and testing each one
+for i in range(6, 7): #creating i amount of subgraphs and testing each one
     k = 2 ** i
-    params = {
-        "k": k
-    }
-    env = NetworkEnvironment(budget=budget, node_id=node_id, kwargs=params)  # Create class instance
-    env.reset() #get sample and populate all value
-    agent = DiscreteActorCritic(env, cuda_flag=False, load_model=False)#activate agent
-    for i in range(10): #for each i in range of 10, training i amount of agent
-        log = agent.train()
-        # agent.save_model()
-    agent.save_model() #save model to reuse and continue to improve on it
+    #
+    env = NetworkEnvironment(
+        budget=budget,
+        node_id=node_id,
+        # k=k,
+        repeat=True
+    )  # Create class instance
+    ajay = DiscreteActorCritic(env, cuda_flag=False, load_model=False)#activate ajay
+    for i in range(1000): #for each i in range of 10, training i amount of ajay
+        log = ajay.train()
+        # ajay.save_model()ds
+    ajay.save_model() #save model to reuse and continue to improve on it
     print()
 
 print(env.r_logger.log)
 env.r_logger.plot_logger()
     #
-    # agent.save_model()
+    # ajay.save_model()
     # print()
 
 

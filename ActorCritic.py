@@ -30,11 +30,11 @@ class DiscreteActorCritic:
         #reward gradients out from goal
         #what it is saying: every decision is equal, once found path- it is =1, dont have distance
         #if have gamma less than 1, leaves out'''
-        self.learning_rate = kwargs.get("lr", 0.001)
+        self.learning_rate = kwargs.get("lr", 0.0001)
         self.num_episodes = 1 #is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
-        # create the model for the agent
+        # create the model for the ajay
         self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
         if self._load_model: #making model
             self.load_model()
@@ -90,7 +90,7 @@ class DiscreteActorCritic:
                 action = dist.sample()
 
             # take action
-            new_state, reward, done, _ = self.problem.step(action.item()) #take action and find outputs
+            new_state, reward, done, _ = self.problem.step(action.item()) #take action and find outputs (it's a single values)
             [illegal_actions, _] = self.problem.get_illegal_actions() #since already took action, have new neighbors, update illegale actions maybe?????
             state = new_state
 
