@@ -37,7 +37,9 @@ def train_upwards():
         ajay.save_model()  # save model to reuse and continue to improve on it
         print()
 
-    print(env.r_logger.log['tot_reward'])
+    print('total reward: ',env.r_logger.log['tot_reward'])
+    print("td error: ",env.r_logger.log['td_error'])
+    print("entropy: ", env.r_logger.log['entropy'])
     env.r_logger.plot_logger()
 
 

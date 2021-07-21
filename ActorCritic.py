@@ -125,8 +125,8 @@ class DiscreteActorCritic:
         L = L_policy + L_value - 0.1 * L_entropy
         L.backward()
         self.optimizer.step()
-        # self.log.add_item('TD_error', L_value.detach().item())
-        # self.log.add_item('entropy', L_entropy.cpu().detach().item())
+        self.problem.r_logger.add_log('td_error', L_value.detach().item())
+        self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
 
     #Run so many numbers of episode then run the model
     def train(self):
