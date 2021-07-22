@@ -122,14 +122,14 @@ class NetworkEnvironment(Env):
 
         if sum(self.edge_vector) == self.budget + self.budget_offset:
             done = True
-            self.r_logger.add_log('tot_reward',self.btwn_cent)  # check if exceeded budget
+            self.r_logger.add_log('tot_reward', self.btwn_cent)  # check if exceeded budget
             print("{:.4f}".format(self.btwn_cent))
 
         info = {}
 
-        return self.dgl_g, torch.Tensor([reward]), done, info  # Tesor so we can take it and appeding
+        return self.dgl_g, torch.Tensor([reward]), done, info  # Tensor so we can take it and appending
 
-    def get_illegal_actions(self):  # tells ajay to not look at neighbors as an action
+    def get_illegal_actions(self):  # tells Ajay to not look at neighbors as an action
         illegal = (self.edge_vector == 1.).nonzero()  # if neighbor of node = illegal
         legal = (self.edge_vector == 0.).nonzero()
         return illegal, legal

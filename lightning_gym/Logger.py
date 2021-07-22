@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+
 class Logger:
     def __init__(self):
         # self.log = {'tot_reward': [], 'entropy': [], 'td_error': []}

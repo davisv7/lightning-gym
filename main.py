@@ -6,39 +6,39 @@ warnings.filterwarnings("ignore")
 
 
 def train_upwards():
-    budget = 10
+    budget = 10  # Initial Budget
     # node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
     node_id = None
-    # Initial Budget
+
 
     total_reward = 0
-    num_episodes = 10 # Change this back to 10k
+    num_episodes = 10  # Change this back to 10k (this is num of episodes)
     load_model = False
-    for power in range(6, 7):  # creating i amount of subgraphs and testing each one
+    for power in range(6, 7):  # Creating x amount of subgraphs and testing each one
         k = 2 ** power
-        #
+
         env = NetworkEnvironment(
             budget=budget,
             node_id=node_id,
             k=k,
             repeat=True,
-            graph_type='scale_free' # this can be changed to different types
-        )  # Create class instance
+            graph_type='scale_free'  # This can be changed to different graph types
+        )
         ajay = DiscreteActorCritic(
             env,
             cuda_flag=False,
             load_model=load_model
-        )  # activate ajay
+        )  # Awaken Ajay the Agent
 
-        for episode in range(num_episodes):  # for each i in range of num_episodes, training i amount of ajay
+        for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
             log = ajay.train()
 
         load_model = True
-        ajay.save_model()  # save model to reuse and continue to improve on it
+        ajay.save_model()  # Save model to reuse and continue to improve on it
         print()
 
-    print('total reward: ',env.r_logger.log['tot_reward'])
-    print("td error: ",env.r_logger.log['td_error'])
+    print('total reward: ', env.r_logger.log['tot_reward'])
+    print("td error: ", env.r_logger.log['td_error'])
     print("entropy: ", env.r_logger.log['entropy'])
     env.r_logger.plot_logger()
 
