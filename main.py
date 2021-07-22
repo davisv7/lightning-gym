@@ -30,7 +30,7 @@ def train_upwards():
             node_id=node_id,
             k=k,
             repeat=False,  # Change to True or False
-            graph_type='scale_free'  # This can be changed to different graph types
+            graph_type='sub_graph'  # This can be changed to different graph types
         )
         env.r_logger = entire_log
         ajay = DiscreteActorCritic(

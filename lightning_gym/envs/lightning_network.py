@@ -95,8 +95,11 @@ class NetworkEnvironment(Env):
         '''
 
         bc = nk.centrality.Betweenness(self.nk_g, normalized=True)  # sets algorithm to find betweeness centrality
+        # bc = nx.betweenness_centrality(self.nx_graph,weight="weight",k=100)
         bc.run()  # Run the algorithm
         b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)  # makes list smaller size
+        # print(bc.scores())
+
         '''Initialize Algorithm
         Indicates how close a node is to all other nodes in the network. 
         '''
@@ -104,10 +107,13 @@ class NetworkEnvironment(Env):
         # Run the algorithm
         dc.run()
         d_centralities = torch.Tensor(dc.scores()).unsqueeze(-1)
+        cc = nk.centrality.Closeness(self.nk_g, False, nk.centrality.ClosenessVariant.Generalized)
+        cc.run()
+        c_centralities = torch.Tensor(cc.scores()).unsqueeze(-1)
 
         ''' appending 3 features in a tensor
         '''
-        self.features = torch.cat((b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
+        self.features = torch.cat((b_centralities, d_centralities, c_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
         self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
 
     def update_features(self):
@@ -164,6 +170,9 @@ class NetworkEnvironment(Env):
         # Adding reward to logger
         # self.r_logger.add_logger(reward)
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
+
+        # reward = sum(nx.betweenness_centrality_source(self.nx_graph,sources=[""]).values())
+
         return reward
 
     def reset(self):
@@ -173,19 +182,20 @@ class NetworkEnvironment(Env):
         if self.repeat and self.base_graph is not None:
             # reload
             self.nx_graph = deepcopy(self.base_graph)
-            pass
         else:
             if self.graph_type == 'snapshot':
                 self.get_random_snapshot()
 
             elif self.graph_type == 'sub_graph':
                 self.get_random_snapshot()
-                self.nx_graph = self.generate_subgraph()
+                self.generate_subgraph()
                 self.nx_graph.add_node("")
 
             elif self.graph_type == 'scale_free':
                 self.random_scale_free()
                 self.nx_graph.add_node(self.k)
+            # print(len(self.nx_graph),len(self.nx_graph.edges))
+            # plot_apsp(undirected(self.nx_graph))
             # self.draw_graph()  # Here we are drawing our graph
 
             self.graph_size = len(self.nx_graph.nodes())
@@ -290,7 +300,8 @@ class NetworkEnvironment(Env):
     #     pass
 
     def generate_subgraph(self):
-        assert self.k < len(self.nx_graph), 'k needs to be smaller than the graph size'
+        if self.k > len(self.nx_graph):
+            return self.nx_graph
 
         included_nodes = set()
         excluded_nodes = set(self.nx_graph.nodes())  # excluded= nodes already found
@@ -312,7 +323,7 @@ class NetworkEnvironment(Env):
             excluded_nodes.difference_update(neighbors)  # Take out the neighbors
             node = random.choice(list(unexplored_neighbors))  # Choose a random node from unexplored neighbors
             unexplored_neighbors.difference_update([node])  # Remove that node from unexplored
-        return nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))  # return networkx graph
+        self.nx_graph = nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))  # return networkx graph
 
     def random_scale_free(self):  # ?????????????????
         self.nx_graph = nx.scale_free_graph(self.k, 0.8, 0.1, 0.1).to_undirected()

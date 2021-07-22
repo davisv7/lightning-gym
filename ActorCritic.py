@@ -21,7 +21,7 @@ class DiscreteActorCritic:
         self.path = 'mvc_net.pt'  # ???????
 
         # hyperparameters ?????????????
-        self.in_feats = kwargs.get("ndim", 3)  # of node features - equal to length of x in BTWN.py
+        self.in_feats = kwargs.get("ndim", 4)  # of node features - equal to length of x in BTWN.py
         self.n_hidden = kwargs.get("hdim", 256)
         self.gamma = kwargs.get("gamma", 1)
         '''#every action brings positive or negative(ours positive)
@@ -31,7 +31,7 @@ class DiscreteActorCritic:
         #reward gradients out from goal
         #what it is saying: every decision is equal, once found path- it is =1, don't have distance
         #if have gamma less than 1, leaves out'''
-        self.learning_rate = kwargs.get("lr", 0.0001)  # this changes the learning rate
+        self.learning_rate = kwargs.get("lr", 0.001)  # this changes the learning rate
         self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
@@ -89,7 +89,7 @@ class DiscreteActorCritic:
             # No possible way they can be selected
             pi[illegal_actions] = -float('Inf')  # Whenever actor is trying to find policy distribution
             # Given this state, what action should i take-
-            # if have illegal action(neighbor) don't want to take thata ction into account
+            # if have illegal action(neighbor) don't want to take that action into account
             pi = F.softmax(pi, dim=0)  # Calculate distribution
             # Get the probability of action we can take, what is this????????????
             dist = torch.distributions.categorical.Categorical(pi)
@@ -127,6 +127,7 @@ class DiscreteActorCritic:
         return PI, R, V, tot_return
 
     def update_model(self, PI, R, V):
+        # R = (R - R.mean()) / (R.std() + 0.00001)
         self.optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:  # ??????????????????????
             R = R.cuda()
@@ -134,13 +135,13 @@ class DiscreteActorCritic:
         L_policy = -(torch.log(PI) * A).mean()
         L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
         L_entropy = -(PI * PI.log()).mean()
-        L = L_policy + L_value - 0.1 * L_entropy
+        L = L_policy + L_value  # - 0.1 * L_entropy
         L.backward()
         self.optimizer.step()
         self.problem.r_logger.add_log('td_error', L_value.detach().item())
         self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
 
-    #Run so many numbers of episode then run the model
+    # Run so many numbers of episode then run the model
     def train(self):
         [PI, R, V, _] = self.run_episode()  # getting new json file, getting new graph/ subgraph
         for i in range(self.num_episodes - 1):  # for each range in episodes, why do have episodes = 1???
