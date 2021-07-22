@@ -38,10 +38,9 @@ def train_upwards():
         ajay = DiscreteActorCritic(
             env,
             cuda_flag=False,
-            load_model=load_model
+            load_model=load_model,
         )  # Awaken Ajay the Agent
-        env.print_configuration()
-        ajay.print_actor_configuration()
+
         for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
             log = ajay.train()
         entire_log = log
