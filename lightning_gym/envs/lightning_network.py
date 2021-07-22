@@ -13,6 +13,7 @@ import random
 from ..Logger import Logger
 from random import sample, shuffle
 from copy import deepcopy
+from ActorCritic import DiscreteActorCritic as DAC
 
 '''
     Get the current directory.
@@ -72,6 +73,19 @@ class NetworkEnvironment(Env):
                                                                            'types, ' \
                                                                            'sub_graph, snapshot, or scale_free.'
 
+    def print_configuration(self):
+        print("Configurations:",
+              "\nGraph Type:", self.graph_type,
+              #"\nGraph Size:", self.graph_size,
+              "\nBudget:", self.budget,
+              "\nRepeat State:", self.repeat,
+              )
+        if self.node_id  is not None:
+            print("Node Id:", self.node_id)
+        print(DAC.print_actor_configuration(self))
+
+
+
     def get_features(self):
 
         '''
@@ -114,7 +128,6 @@ class NetworkEnvironment(Env):
             '''what if, by adding a node twice, we remove it? increase budget, reward is negative change
             we would have to reinit the betweenness calculator on edge removals, which isn't terrible
             '''
-
             self.edge_vector[action] = 1  # mark as explored in edge vector
             # calculate reward
             reward = self.get_reward(action)
