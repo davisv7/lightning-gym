@@ -75,14 +75,13 @@ class NetworkEnvironment(Env):
 
     def print_configuration(self):
         print("Configurations:",
-              "\nGraph Type:", self.graph_type,
-              #"\nGraph Size:", self.graph_size,
-              "\nBudget:", self.budget,
-              "\nRepeat State:", self.repeat,
+              "Graph Type: {}".format(self.graph_type),
+              "Budget: {}".format(self.budget),
+              "Repeat State: {}".format(self.repeat),
+              sep="\n\t"
               )
         if self.node_id  is not None:
             print("Node Id:", self.node_id)
-        print(DAC.print_actor_configuration(self))
 
 
 

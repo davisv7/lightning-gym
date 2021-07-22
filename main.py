@@ -12,6 +12,7 @@ values = {
     'load_model': False,
 }
 
+
 def train_upwards():
     budget = values['budget']
     # node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
@@ -19,7 +20,7 @@ def train_upwards():
     # Initial Budget
 
     total_reward = 0
-    num_episodes = values['num_episodes']# Change this back to 10k
+    num_episodes = values['num_episodes']  # Change this back to 10k
     load_model = values['load_model']
     for power in range(6, 7):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
@@ -37,6 +38,7 @@ def train_upwards():
             load_model=load_model
         )  # Awaken Ajay the Agent
         env.print_configuration()
+        ajay.print_actor_configuration()
         for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
             log = ajay.train()
         entire_log = log
@@ -50,14 +52,12 @@ def train_upwards():
     env.r_logger.plot_logger()
 
 
-
 def print_prompt():
-    print("The agent will run in the enviroment with the follwing paramaters\n",
-          "budget",values['budget'],
-          ", node_id", values['node_id'],
-          ", num_episodes", values['num_episodes'],
-          ", load_model", values['load_model'])
-
+    print("The agent will run in the enviroment with the follwing paramaters:",
+          "budget: {}".format(values['budget']),
+          "node_id: {}".format(values['node_id']),
+          "num_episodes: {}".format(values['num_episodes']),
+          "load_model: {}".format(values['load_model']), sep="\n\t")
 
 
 if __name__ == '__main__':

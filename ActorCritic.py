@@ -52,11 +52,13 @@ class DiscreteActorCritic:
         # self.log.add_log('entropy')
         # self.log.add_log('gains')
 
-    def print_actor_configuration(self):
+    def print_actor_configuration(self,):
 
-        self.p_model =("\nLoad model:", self._load_model,
-                "\nLearning Rate:", self.learning_rate,)
-        return self.p_model
+        print("\tLoad model: {}".format(self._load_model),
+                "Learning Rate: {}".format(self.learning_rate),
+              sep="\n\t"
+              )
+
 
     def run_episode(self):  # similar to epochs
         done = False
