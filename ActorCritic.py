@@ -141,7 +141,7 @@ class DiscreteActorCritic:
             V = torch.cat([V, v], dim=0)
 
         self.update_model(PI, R, V)
-        # return self.log
+        return self.problem.r_logger
 
     def test(self):  # ?
         [_, _, _, _] = self.run_episode()

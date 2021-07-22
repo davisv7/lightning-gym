@@ -1,6 +1,7 @@
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 import warnings
 from ActorCritic import DiscreteActorCritic
+from lightning_gym.Logger import Logger
 
 warnings.filterwarnings("ignore")
 
@@ -14,6 +15,7 @@ def train_upwards():
     total_reward = 0
     num_episodes = 1000  # Change this back to 10k (this is num of episodes)
     load_model = False
+    entire_log = Logger()
     for power in range(5, 11):  # Creating x amount of subgraphs and testing each one
         k = 2 ** power
 
@@ -24,6 +26,7 @@ def train_upwards():
             repeat=False,  # Change to True or False
             graph_type='scale_free'  # This can be changed to different graph types
         )
+        env.r_logger = entire_log
         ajay = DiscreteActorCritic(
             env,
             cuda_flag=False,
@@ -32,6 +35,7 @@ def train_upwards():
 
         for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
             log = ajay.train()
+        entire_log = log
 
         load_model = True
         ajay.save_model()  # Save model to reuse and continue to improve on it
