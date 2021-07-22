@@ -14,7 +14,7 @@ class Logger:
 
     def plot_logger(self):
         # y = len(self.log)
-        X = list(range (0, len(self.log['tot_reward'])))
+        X = list(range(0, len(self.log['tot_reward'])))
         plt.plot(X, self.log['tot_reward'])
         print('here')
         plt.show()

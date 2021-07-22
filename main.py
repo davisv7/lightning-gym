@@ -12,16 +12,16 @@ def train_upwards():
 
 
     total_reward = 0
-    num_episodes = 10  # Change this back to 10k (this is num of episodes)
+    num_episodes = 1000  # Change this back to 10k (this is num of episodes)
     load_model = False
-    for power in range(6, 7):  # Creating x amount of subgraphs and testing each one
+    for power in range(5, 11):  # Creating x amount of subgraphs and testing each one
         k = 2 ** power
 
         env = NetworkEnvironment(
             budget=budget,
             node_id=node_id,
             k=k,
-            repeat=True,
+            repeat=False,  # Change to True or False
             graph_type='scale_free'  # This can be changed to different graph types
         )
         ajay = DiscreteActorCritic(

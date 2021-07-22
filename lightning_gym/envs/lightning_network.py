@@ -13,6 +13,7 @@ import random
 from ..Logger import Logger
 from random import sample, shuffle
 from copy import deepcopy
+import matplotlib.pyplot as plt
 
 '''
     Get the current directory.
@@ -112,7 +113,7 @@ class NetworkEnvironment(Env):
         else:
 
             '''what if, by adding a node twice, we remove it? increase budget, reward is negative change
-            we would have to reinit the betweenness calculator on edge removals, which isn't terrible
+            we would have to reinitialize the betweenness calculator on edge removals, which isn't terrible
             '''
 
             self.edge_vector[action] = 1  # mark as explored in edge vector
@@ -174,7 +175,7 @@ class NetworkEnvironment(Env):
             elif self.graph_type == 'scale_free':
                 self.random_scale_free()
                 self.nx_graph.add_node(self.k)
-
+            # self.draw_graph()  # Here we are drawing our graph
 
             self.graph_size = len(self.nx_graph.nodes())
 
@@ -214,6 +215,36 @@ class NetworkEnvironment(Env):
         self.btwn_cent = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
 
         return self.dgl_g
+
+    def draw_graph(self):
+
+        if self.graph_type == 'snapshot':
+            nx.draw(self.nx_graph,
+                    node_color='blue',
+                    edge_color='yellow',
+                    node_size=150,
+                    node_shape='.'
+                    )
+            plt.show()
+
+        elif self.graph_type == 'sub_graph':
+            nx.draw(self.nx_graph,
+                    node_color='red',
+                    edge_color='green',
+                    node_size=150,
+                    node_shape='h'
+                    )
+            plt.show()
+
+        elif self.graph_type == 'scale_free':
+            nx.draw(self.nx_graph,
+                    node_color='purple',
+                    edge_color='pink',
+                    with_labels=True,
+                    node_size=150,
+                    node_shape='h'
+                    )
+            plt.show()
 
     def get_random_snapshot(self):
         # make random graph

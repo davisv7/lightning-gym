@@ -31,7 +31,7 @@ class DiscreteActorCritic:
         #reward gradients out from goal
         #what it is saying: every decision is equal, once found path- it is =1, don't have distance
         #if have gamma less than 1, leaves out'''
-        self.learning_rate = kwargs.get("lr", 0.001)
+        self.learning_rate = kwargs.get("lr", 0.0001)  # this changes the learning rate
         self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
