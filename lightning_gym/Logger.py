@@ -16,5 +16,4 @@ class Logger:
         # y = len(self.log)
         X = list(range(0, len(self.log['tot_reward'])))
         plt.plot(X, self.log['tot_reward'])
-        print('here')
         plt.show()

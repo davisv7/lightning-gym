@@ -92,3 +92,4 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
             seen.append((u, v))
 
     return nk_graph
+

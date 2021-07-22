@@ -52,6 +52,12 @@ class DiscreteActorCritic:
         # self.log.add_log('entropy')
         # self.log.add_log('gains')
 
+    def print_actor_configuration(self):
+
+        self.p_model =("\nLoad model:", self._load_model,
+                "\nLearning Rate:", self.learning_rate,)
+        return self.p_model
+
     def run_episode(self):  # similar to epochs
         done = False
         state = self.problem.reset()  # We get our initial state by resetting
@@ -81,7 +87,7 @@ class DiscreteActorCritic:
             # No possible way they can be selected
             pi[illegal_actions] = -float('Inf')  # Whenever actor is trying to find policy distribution
             # Given this state, what action should i take-
-            # if have illegal action(neighbor) don't want to take that action into account
+            # if have illegal action(neighbor) don't want to take thata ction into account
             pi = F.softmax(pi, dim=0)  # Calculate distribution
             # Get the probability of action we can take, what is this????????????
             dist = torch.distributions.categorical.Categorical(pi)
@@ -92,8 +98,10 @@ class DiscreteActorCritic:
                 action = dist.sample()
 
             # take action
-            new_state, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs
-            [illegal_actions, _] = self.problem.get_illegal_actions()
+            new_state, reward, done, _ = self.problem.step(
+                action.item())  # Take action and find outputs
+            [illegal_actions,
+             _] = self.problem.get_illegal_actions()
             state = new_state
 
             # collect outputs of networks for learning - cat = appending for tensors
@@ -130,7 +138,7 @@ class DiscreteActorCritic:
         self.problem.r_logger.add_log('td_error', L_value.detach().item())
         self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
 
-    # Run so many numbers of episode then run the model
+    #Run so many numbers of episode then run the model
     def train(self):
         [PI, R, V, _] = self.run_episode()  # getting new json file, getting new graph/ subgraph
         for i in range(self.num_episodes - 1):  # for each range in episodes, why do have episodes = 1???

@@ -5,20 +5,24 @@ from lightning_gym.Logger import Logger
 
 warnings.filterwarnings("ignore")
 
+values = {
+    'budget': 10,
+    'node_id': None,
+    'num_episodes': 10,
+    'load_model': False,
+}
 
 def train_upwards():
-    budget = 10  # Initial Budget
+    budget = values['budget']
     # node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
-    node_id = None
-
+    node_id = values['node_id']
+    # Initial Budget
 
     total_reward = 0
-    num_episodes = 1000  # Change this back to 10k (this is num of episodes)
-    load_model = False
-    entire_log = Logger()
-    for power in range(5, 11):  # Creating x amount of subgraphs and testing each one
+    num_episodes = values['num_episodes']# Change this back to 10k
+    load_model = values['load_model']
+    for power in range(6, 7):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
-
         env = NetworkEnvironment(
             budget=budget,
             node_id=node_id,
@@ -32,11 +36,10 @@ def train_upwards():
             cuda_flag=False,
             load_model=load_model
         )  # Awaken Ajay the Agent
-
+        env.print_configuration()
         for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
             log = ajay.train()
         entire_log = log
-
         load_model = True
         ajay.save_model()  # Save model to reuse and continue to improve on it
         print()
@@ -47,7 +50,18 @@ def train_upwards():
     env.r_logger.plot_logger()
 
 
+
+def print_prompt():
+    print("The agent will run in the enviroment with the follwing paramaters\n",
+          "budget",values['budget'],
+          ", node_id", values['node_id'],
+          ", num_episodes", values['num_episodes'],
+          ", load_model", values['load_model'])
+
+
+
 if __name__ == '__main__':
+    print_prompt()
     train_upwards()
 
 # warnings.filterwarnings("ignore")
