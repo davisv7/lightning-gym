@@ -14,6 +14,7 @@ from ..Logger import Logger
 from random import sample, shuffle
 from copy import deepcopy
 import matplotlib.pyplot as plt
+import graph_tools as gt
 
 '''
     Get the current directory.
@@ -216,7 +217,7 @@ class NetworkEnvironment(Env):
                 # self.graph_size += 1
             if self.repeat:
                 self.base_graph = deepcopy(self.nx_graph)
-
+        self.gt_g = nx_to_gt(self.nx_graph)
         '''convert networkx to dgl'''
         self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
 

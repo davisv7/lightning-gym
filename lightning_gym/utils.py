@@ -8,6 +8,7 @@ from networkx import Graph as nx_Graph
 from networkit import Graph as nk_Graph
 from typing import Dict
 import itertools
+import graph_tools as gt
 
 ''' 
     getcwd() returns the current working directory of a processes
@@ -96,6 +97,25 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
     return nk_graph
 
 
+def nx_to_gt(nx_graph):
+    gt_g = gt.Graph(directed=True)
+
+    edge_weights = gt_g.new_edge_property('double')
+
+    for node in nx_graph.nodes():  # n nodes into the nk_graph
+        gt_g.add_vertex(node)
+
+    for u, v in nx_graph.edges():
+        w1 = nx_graph[u][v].get('weight', 1)
+        w2 = nx_graph[v][u].get('weight', 1)
+        fee = max(w1, w2)
+        gt_g.add_edge(gt_g.vertex(u), gt_g.vertex(v))
+        edge_weights[(gt_g.vertex(u), gt_g.vertex(v))] = fee
+
+    gt_g.edge_properties['weights'] = edge_weights
+    return gt_g
+
+
 def undirected(nx_graph):
     seen = []
     undirected_graph = nx.Graph()
@@ -127,7 +147,5 @@ def plot_apsp(nx_graph):  # apsp:all pair shortest paths
     shortest_lengths = list(nx.all_pairs_bellman_ford_path_length(nx_graph))  # gives list of lengths
     shortest_lengths = [x[1].values() for x in shortest_lengths]
     shortest_lengths = list(itertools.chain(*shortest_lengths))
-    plt.hist(shortest_lengths,)  # bins = [1, 10, 100, 500, 3000])
+    plt.hist(shortest_lengths, )  # bins = [1, 10, 100, 500, 3000])
     plt.show()
-
-
