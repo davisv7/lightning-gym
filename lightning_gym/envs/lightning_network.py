@@ -190,15 +190,27 @@ class NetworkEnvironment(Env):
         else:
             if self.graph_type == 'snapshot':
                 self.get_random_snapshot()
+                if self.node_id is not None:
+                    self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
+                    self.node_index = self.index_to_node.inverse[self.node_id]
+                else:  # ??????????????
+                    self.node_id = ''
+                    self.nx_graph.add_node(self.node_id)
+                    self.node_index = len(self.nx_graph)
 
             elif self.graph_type == 'sub_graph':
                 self.get_random_snapshot()
                 self.generate_subgraph()
-                self.nx_graph.add_node("")
+                self.node_id = ''
+                self.node_index = len(self.nx_graph)
+                self.nx_graph.add_node(self.node_id)
 
             elif self.graph_type == 'scale_free':
                 self.random_scale_free()
-                self.nx_graph.add_node(self.k)
+                self.node_id = self.k
+                self.node_index = len(self.nx_graph)
+                self.nx_graph.add_node(self.node_id)
+
             # print(len(self.nx_graph),len(self.nx_graph.edges))
             # plot_apsp(undirected(self.nx_graph))
             # self.draw_graph()  # Here we are drawing our graph
@@ -210,19 +222,10 @@ class NetworkEnvironment(Env):
             self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
 
             '''if want to test node_id, convert str key to int index '''
-            if self.node_id is not None:
-                self.node_index = self.index_to_node.inverse[self.node_id]
-            else:  # ??????????????
-                if self.graph_type == 'snapshot':
-                    self.nx_graph.add_node("")
-                    self.graph_size = len(self.nx_graph.nodes())
 
-                self.node_index = self.graph_size-1
-                # self.graph_size += 1
             if self.repeat:
                 self.base_graph = deepcopy(self.nx_graph)
         self.ig_g = nx_to_ig(self.nx_graph)
-        print(self.ig_g.betweenness(self.node_id)[self.node_index])
         '''convert networkx to dgl'''
         self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
 

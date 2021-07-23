@@ -23,7 +23,9 @@ def train_upwards():
     num_episodes = values['num_episodes']  # Change this back to 10k
     load_model = values['load_model']
     entire_log = Logger()
-    for power in range(10, 11):  # creating i amount of subgraphs and testing each one
+    start = 10
+    end = start + 1
+    for power in range(start, end):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
         env = NetworkEnvironment(
             budget=budget,
