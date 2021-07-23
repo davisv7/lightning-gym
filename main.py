@@ -8,7 +8,7 @@ warnings.filterwarnings("ignore")
 values = {
     'budget': 10,
     'node_id': None,
-    'num_episodes': 10,
+    'num_episodes': 1000,
     'load_model': False,
 }
 
@@ -23,15 +23,15 @@ def train_upwards():
     num_episodes = values['num_episodes']  # Change this back to 10k
     load_model = values['load_model']
     entire_log = Logger()
-    start = 6
-    end = start + 5
+    start = 8
+    end = start + 1
     for power in range(start, end):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
         env = NetworkEnvironment(
             budget=budget,
             node_id=node_id,
             k=k,
-            repeat=False,  # Change to True or False
+            repeat=True,  # Change to True or False
             graph_type='sub_graph'  # This can be changed to different graph types
         )
         env.r_logger = entire_log

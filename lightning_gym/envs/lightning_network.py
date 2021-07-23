@@ -14,7 +14,6 @@ from ..Logger import Logger
 from random import sample, shuffle
 from copy import deepcopy
 import matplotlib.pyplot as plt
-import graph_tools as gt
 
 '''
     Get the current directory.
@@ -81,10 +80,8 @@ class NetworkEnvironment(Env):
               "Repeat State: {}".format(self.repeat),
               sep="\n\t"
               )
-        if self.node_id  is not None:
+        if self.node_id is not None:
             print("Node Id:", self.node_id)
-
-
 
     def get_features(self):
 
@@ -94,16 +91,17 @@ class NetworkEnvironment(Env):
         paths between other nodes. Nodes with high betweeness
         could have considerable more influence.
         '''
-
-        bc = nk.centrality.Betweenness(self.nk_g, normalized=True)  # sets algorithm to find betweeness centrality
-        # bc = nx.betweenness_centrality(self.nx_graph,weight="weight",k=100)
-        bc.run()  # Run the algorithm
-        b_centralities = torch.Tensor(bc.scores()).unsqueeze(-1)  # makes list smaller size
-        # print(bc.scores())
+        weights = self.ig_g.es["weight"]
+        norm = (self.graph_size * (self.graph_size - 1) / 2)
+        indices = self.ig_g.vs().indices
+        b_centralities = self.ig_g.betweenness(indices, weights=weights)
+        b_centralities = [val / norm for val in b_centralities]
+        b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)  # makes list smaller size
 
         '''Initialize Algorithm
         Indicates how close a node is to all other nodes in the network. 
         '''
+        # TODO find networkit replacement
         dc = nk.centrality.DegreeCentrality(self.nk_g, normalized=True)
         # Run the algorithm
         dc.run()
@@ -114,16 +112,17 @@ class NetworkEnvironment(Env):
 
         ''' appending 3 features in a tensor
         '''
-        self.features = torch.cat((b_centralities, d_centralities, c_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
+        self.features = torch.cat(
+            (b_centralities, d_centralities, c_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1)
         self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
 
     def update_features(self):
-        col_idx = torch.Tensor(np.repeat(-1, self.features.size(0))).long()  # ????????????
+        col_idx = torch.Tensor(np.repeat(-1, self.features.size(0))).long()
         rows = torch.arange(self.features.size(0)).long()
         update_values = torch.FloatTensor(self.edge_vector)
 
         self.features[rows, col_idx] = update_values
-        self.dgl_g.ndata['features'] = self.features  # .ndta??
+        self.dgl_g.ndata['features'] = self.features  # ndata
 
     def step(self, action: int):  # make action and give reward
         done = False
@@ -156,34 +155,19 @@ class NetworkEnvironment(Env):
     def get_reward(self, action):  # if add node, what is the betweeness centrality?
         neighbor_index = action
         neighbor_id = self.index_to_node[neighbor_index]
-        # event_type = 3  # nk.dynamic.GraphEvent.EDGE_ADDITION = 3
-        #
-        # # add an edge in one direction
-        # self.nk_g.addEdge(self.node_index, neighbor_index, w=1)  # making action node our neighbor
-        # event = nk.dynamic.GraphEvent(event_type, self.node_index, neighbor_index, 1)  # Something happends to the graph
-        # self.dyn_btwn_getter.update(event)  # degree centrality
-
-        # # and another in the other direction
-        # self.nk_g.addEdge(neighbor_index, self.node_index, w=1)
-        # event = nk.dynamic.GraphEvent(event_type, neighbor_index, self.node_index, 1)
-        # self.dyn_btwn_getter.update(event)
-        # new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)  # normalize Btwn Cent
-        self.ig_g.add_edge(neighbor_id,self.node_id,weight=1)
-        weights=self.ig_g.es["weight"]
-        new_btwn = self.ig_g.betweenness(self.node_id,weights=weights) / (self.graph_size * (self.graph_size - 1) / 2) # normalize Btwn Cent
+        self.ig_g.add_edge(neighbor_id, self.node_id, weight=1)
+        weights = self.ig_g.es["weight"]
+        norm = (self.graph_size * (self.graph_size - 1) / 2)
+        new_btwn = self.ig_g.betweenness(self.node_id, weights=weights) / norm  # normalize Btwn Cent
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         # Adding reward to logger
         # self.r_logger.add_logger(reward)
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
 
         # reward = sum(nx.betweenness_centrality_source(self.nx_graph,sources=[""]).values())
-        print(new_btwn)
         return reward
 
     def reset(self):
-
-        # if repeat == true , take base graph = nxt graph that we load the first time
-
         if self.repeat and self.base_graph is not None:
             # reload
             self.nx_graph = deepcopy(self.base_graph)
@@ -193,7 +177,7 @@ class NetworkEnvironment(Env):
                 if self.node_id is not None:
                     self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
                     self.node_index = self.index_to_node.inverse[self.node_id]
-                else:  # ??????????????
+                else:
                     self.node_id = ''
                     self.nx_graph.add_node(self.node_id)
                     self.node_index = len(self.nx_graph)
@@ -211,12 +195,7 @@ class NetworkEnvironment(Env):
                 self.node_index = len(self.nx_graph)
                 self.nx_graph.add_node(self.node_id)
 
-            # print(len(self.nx_graph),len(self.nx_graph.edges))
-            # plot_apsp(undirected(self.nx_graph))
-            # self.draw_graph()  # Here we are drawing our graph
-
             self.graph_size = len(self.nx_graph.nodes())
-
 
             # Create bidictionary = tuple index: pubKey
             self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
@@ -239,11 +218,9 @@ class NetworkEnvironment(Env):
         '''get degree centrality of given node
         should we normalize the degree centrality????????
         '''
-        self.dyn_btwn_getter = nk.centrality.DynBetweennessOneNode(self.nk_g, self.node_index)
-        self.dyn_btwn_getter.run()
-        # get betweeness centrality of given node, value is normalized
-        self.btwn_cent = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)
-
+        weights = self.ig_g.es["weight"]
+        norm = (self.graph_size * (self.graph_size - 1) / 2)
+        self.btwn_cent = self.ig_g.betweenness(self.node_id, weights=weights) / norm
         return self.dgl_g
 
     def draw_graph(self):
@@ -285,14 +262,12 @@ class NetworkEnvironment(Env):
         # Create nx_graph
         self.nx_graph = make_nx_graph(nodes, edges)
 
-    # render on frame of environment at a time
-
     # Given public ID number from a node
     def get_edge_vector_from_node(self):
         # Create a vector of zeros to the length of the graph_size
         self.edge_vector = np.array([0 for _ in range(self.graph_size)])
 
-        if self.node_id is not None:  # why double checking node id?????????
+        if self.node_id is not None:
             for edge in self.edges:  # trying to find neighbors of node
                 if edge[0] == self.node_id:
                     neighbor_index = self.index_to_node.inverse[edge[1]]
@@ -305,8 +280,6 @@ class NetworkEnvironment(Env):
         random_key = random.choice(self.nodes)
         return random_key
 
-    # def render(self, mode='channel'):
-    #     pass
 
     def generate_subgraph(self):
         if self.k > len(self.nx_graph):
@@ -316,7 +289,7 @@ class NetworkEnvironment(Env):
         excluded_nodes = set(self.nx_graph.nodes())  # excluded= nodes already found
         unexplored_neighbors = set()  # empty set of unexplored neighbors = k doesnt allow to explore neighbor
 
-        node = random.choice(list(excluded_nodes))  # Take a random node to start BFS=breathd first search
+        node = random.choice(list(excluded_nodes))  # Take a random node to start BFS=breadth first search
         excluded_nodes.difference_update([node])  # Take node from non-explored
         included_nodes.add(node)  # Add node in visited nodes
         while len(included_nodes) < self.k:
@@ -327,12 +300,12 @@ class NetworkEnvironment(Env):
             neighbors = set(neighbors[:cutoff])  # Get the nodes up to
 
             unexplored_neighbors = unexplored_neighbors.union(
-                neighbors - included_nodes)  # Add cutoff = uexplored neighbors
+                neighbors - included_nodes)  # Add cutoff = unexplored neighbors
             included_nodes = included_nodes.union(neighbors)  # Add return n into included nodes
             excluded_nodes.difference_update(neighbors)  # Take out the neighbors
             node = random.choice(list(unexplored_neighbors))  # Choose a random node from unexplored neighbors
             unexplored_neighbors.difference_update([node])  # Remove that node from unexplored
         self.nx_graph = nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))  # return networkx graph
 
-    def random_scale_free(self):  # ?????????????????
+    def random_scale_free(self):
         self.nx_graph = nx.scale_free_graph(self.k, 0.8, 0.1, 0.1).to_undirected()

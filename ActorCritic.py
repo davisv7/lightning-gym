@@ -16,11 +16,11 @@ class DiscreteActorCritic:
     def __init__(self, problem, cuda_flag=False, load_model=False, **kwargs):
 
         self.problem = problem  # environment
-        self.cuda = cuda_flag  # ??????????????????
+        self.cuda = cuda_flag
         self._load_model = load_model  # if have previous model to pass down
-        self.path = 'mvc_net.pt'  # ???????
+        self.path = 'mvc_net.pt'
 
-        # hyperparameters ?????????????
+        # hyperparameters
         self.in_feats = kwargs.get("ndim", 4)  # of node features - equal to length of x in BTWN.py
         self.n_hidden = kwargs.get("hdim", 256)
         self.gamma = kwargs.get("gamma", 1)
@@ -39,7 +39,7 @@ class DiscreteActorCritic:
         self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
         if self._load_model:  # making model
             self.load_model()
-        if cuda_flag:  # ?????????????????????????
+        if cuda_flag:
             self.model = self.model.cuda()
 
         # Does optimizer make it work better?
