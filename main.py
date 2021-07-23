@@ -6,7 +6,7 @@ from lightning_gym.Logger import Logger
 warnings.filterwarnings("ignore")
 
 values = {
-    'budget': 10,
+    'budget': 100,
     'node_id': None,
     'num_episodes': 10,
     'load_model': False,
@@ -23,7 +23,7 @@ def train_upwards():
     num_episodes = values['num_episodes']  # Change this back to 10k
     load_model = values['load_model']
     entire_log = Logger()
-    for power in range(6, 7):  # creating i amount of subgraphs and testing each one
+    for power in range(10, 11):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
         env = NetworkEnvironment(
             budget=budget,

@@ -155,6 +155,7 @@ class NetworkEnvironment(Env):
 
     def get_reward(self, action):  # if add node, what is the betweeness centrality?
         neighbor_index = action
+        neighbor_id = self.index_to_node[neighbor_index]
         event_type = 3  # nk.dynamic.GraphEvent.EDGE_ADDITION = 3
 
         # add an edge in one direction
@@ -166,7 +167,10 @@ class NetworkEnvironment(Env):
         # self.nk_g.addEdge(neighbor_index, self.node_index, w=1)
         # event = nk.dynamic.GraphEvent(event_type, neighbor_index, self.node_index, 1)
         # self.dyn_btwn_getter.update(event)
-        new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)  # normalize Btwn Cent
+        # new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)  # normalize Btwn Cent
+        self.ig_g.add_edge(neighbor_id,self.node_id,weight=1)
+        weights=self.ig_g.es["weight"]
+        new_btwn = self.ig_g.betweenness(self.node_id,weights=weights)[self.node_index]  # normalize Btwn Cent
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         # Adding reward to logger
         # self.r_logger.add_logger(reward)
@@ -217,7 +221,8 @@ class NetworkEnvironment(Env):
                 # self.graph_size += 1
             if self.repeat:
                 self.base_graph = deepcopy(self.nx_graph)
-        self.gt_g = nx_to_gt(self.nx_graph)
+        self.ig_g = nx_to_ig(self.nx_graph)
+        print(self.ig_g.betweenness(self.node_id)[self.node_index])
         '''convert networkx to dgl'''
         self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
 

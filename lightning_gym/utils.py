@@ -8,7 +8,7 @@ from networkx import Graph as nx_Graph
 from networkit import Graph as nk_Graph
 from typing import Dict
 import itertools
-import graph_tools as gt
+import igraph as ig
 
 ''' 
     getcwd() returns the current working directory of a processes
@@ -97,23 +97,33 @@ def nx_to_nk(nx_graph: nx_Graph, index_to_node) -> (nk_Graph, Dict):
     return nk_graph
 
 
-def nx_to_gt(nx_graph):
-    gt_g = gt.Graph(directed=True)
-
-    edge_weights = gt_g.new_edge_property('double')
-
+def nx_to_ig(nx_graph):
+    ig_g = ig.Graph()
     for node in nx_graph.nodes():  # n nodes into the nk_graph
-        gt_g.add_vertex(node)
+        ig_g.add_vertex(name=node)
 
     for u, v in nx_graph.edges():
         w1 = nx_graph[u][v].get('weight', 1)
         w2 = nx_graph[v][u].get('weight', 1)
-        fee = max(w1, w2)
-        gt_g.add_edge(gt_g.vertex(u), gt_g.vertex(v))
-        edge_weights[(gt_g.vertex(u), gt_g.vertex(v))] = fee
+        fee = max(w1, w2,1)
+        ig_g.add_edge(u, v, weight=fee)
+    return ig_g
 
-    gt_g.edge_properties['weights'] = edge_weights
-    return gt_g
+
+# def nx_to_gt(nx_graph):
+#     gt_g = gt.Graph(directed=False)
+#
+#     for node in nx_graph.nodes():  # n nodes into the nk_graph
+#         gt_g.add_vertex(node)
+#
+#     for u, v in nx_graph.edges():
+#         w1 = nx_graph[u][v].get('weight', 1)
+#         w2 = nx_graph[v][u].get('weight', 1)
+#         fee = max(w1, w2)
+#         gt_g.add_edge(u, v)
+#         gt_g.set_edge_weight(u, v,fee)
+#
+#     return gt_g
 
 
 def undirected(nx_graph):
