@@ -156,12 +156,12 @@ class NetworkEnvironment(Env):
     def get_reward(self, action):  # if add node, what is the betweeness centrality?
         neighbor_index = action
         neighbor_id = self.index_to_node[neighbor_index]
-        event_type = 3  # nk.dynamic.GraphEvent.EDGE_ADDITION = 3
-
-        # add an edge in one direction
-        self.nk_g.addEdge(self.node_index, neighbor_index, w=1)  # making action node our neighbor
-        event = nk.dynamic.GraphEvent(event_type, self.node_index, neighbor_index, 1)  # Something happends to the graph
-        self.dyn_btwn_getter.update(event)  # degree centrality
+        # event_type = 3  # nk.dynamic.GraphEvent.EDGE_ADDITION = 3
+        #
+        # # add an edge in one direction
+        # self.nk_g.addEdge(self.node_index, neighbor_index, w=1)  # making action node our neighbor
+        # event = nk.dynamic.GraphEvent(event_type, self.node_index, neighbor_index, 1)  # Something happends to the graph
+        # self.dyn_btwn_getter.update(event)  # degree centrality
 
         # # and another in the other direction
         # self.nk_g.addEdge(neighbor_index, self.node_index, w=1)
@@ -170,14 +170,14 @@ class NetworkEnvironment(Env):
         # new_btwn = self.dyn_btwn_getter.getbcx() / (self.graph_size * (self.graph_size - 1) / 2)  # normalize Btwn Cent
         self.ig_g.add_edge(neighbor_id,self.node_id,weight=1)
         weights=self.ig_g.es["weight"]
-        new_btwn = self.ig_g.betweenness(self.node_id,weights=weights)[self.node_index]  # normalize Btwn Cent
+        new_btwn = self.ig_g.betweenness(self.node_id,weights=weights) / (self.graph_size * (self.graph_size - 1) / 2) # normalize Btwn Cent
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         # Adding reward to logger
         # self.r_logger.add_logger(reward)
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
 
         # reward = sum(nx.betweenness_centrality_source(self.nx_graph,sources=[""]).values())
-
+        print(new_btwn)
         return reward
 
     def reset(self):
