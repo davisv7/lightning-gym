@@ -4,7 +4,6 @@ References:
 - Paper: https://arxiv.org/abs/1609.02907
 - Code: https://github.com/tkipf/gcn
 """
-import torch
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
 from dgl import readout_nodes
@@ -16,26 +15,25 @@ class GCN(nn.Module):  # Create GCN class
                  n_hidden,  # Size of Hidden Features (Neighbors features)
                  n_classes,  # Size of final features vector
                  n_layers,  # Number of layers
-                 activation  # Activation layer Relu in our case
-                 # dropout
+                 activation,  # Activation layer Relu in our case
+                 dropout=0.01
                  ):
         super(GCN, self).__init__()
 
         # Why Policy and value
-        self.policy = nn.Linear(n_classes, 1)  # We know is the output of the GCN
+        self.policy = nn.Linear(n_classes, 1,)  # We know is the output of the GCN
         self.value = nn.Linear(n_classes, 1, )  # Output?
         self.layers = nn.ModuleList()  # Create empty list of layers
         # input layer
         self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
         # hidden layers
-        for i in range(n_layers - 1):  # Representation of neighbors
+        for i in range(n_layers - 2):  # Representation of neighbors
             self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
         # output layer
         self.layers.append(GraphConv(n_hidden, n_classes))  # Making x by x hidden layer
-        # self.dropout = nn.Dropout(p=dropout)
+        self.dropout = nn.Dropout(p=dropout)
 
-    # self.gcn.forward(self.dgl_g), torch.Tensor([reward])
-    def forward(self, g):  # ??????
+    def forward(self, g):
         '''
         features pass to j
         b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1
