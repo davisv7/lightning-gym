@@ -6,8 +6,11 @@ Created on Sun Dec 30 16:20:39 2018
 """
 import torch
 import torch.nn.functional as F
+from random import choice
 from lightning_gym.GCN import GCN
-from lightning_gym.ACN import ACN
+
+
+# from lightning_gym.ACN import ACN
 
 
 class DiscreteActorCritic:
@@ -25,12 +28,12 @@ class DiscreteActorCritic:
         '''
         gamma - defines how the contribution of past rewards are discounted if gamma is 1, then there is no discount
         '''
-        self.learning_rate = kwargs.get("lr", 1.5e-3)  # this changes the learning rate
+        self.learning_rate = kwargs.get("lr", 3e-4)  # this changes the learning rate
         self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
         # create the model for the ajay
-        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=4, activation=F.leaky_relu)
+        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
         # self.acnet = ACN(self.n_hidden)
         if self._load_model:  # making model
             self.load_model()
@@ -95,7 +98,7 @@ class DiscreteActorCritic:
             V = torch.cat([V, val.unsqueeze(0)], dim=0)
 
         tot_return = R.sum().item()
-        self.problem.r_logger.add_log('tot_return', tot_return)
+        self.problem.r_logger.add_log('tot_reward', tot_return)
         # self.log.add_item('gains',np.flip(R.numpy()))
 
         # discount past rewards, rewards of the past are worth less
@@ -120,6 +123,7 @@ class DiscreteActorCritic:
             action = dist.probs.argmax()
         else:
             action = dist.sample()
+            # action = choice([dist.probs.argmax, dist.sample])()
         return action
 
     def update_model(self, PI, R, V):

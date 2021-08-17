@@ -45,8 +45,12 @@ def nx_to_ig(nx_graph):
     ig_g = ig.Graph()
     for node in nx_graph.nodes():  # n nodes into the nk_graph
         ig_g.add_vertex(name=node)
-
+    seen = set()
     for u, v in nx_graph.edges():
+        if (v,u) in seen:
+            continue
+        else:
+            seen.add((u,v))
         w1 = nx_graph[u][v].get('weight', 1)
         w2 = nx_graph[v][u].get('weight', 1)
         fee = max(min(w1, w2), 1)

@@ -6,10 +6,10 @@ from lightning_gym.utils import plot_apsp
 warnings.filterwarnings("ignore")
 
 
-def train_upwards(node_id=None, budget=10, num_episodes=100, load_model=False):
+def train_upwards(node_id=None, budget=10, num_episodes=200, load_model=False):
     entire_log = Logger()
-    start = 4
-    end = start + 1
+    start = 6
+    end = start + 7
     for power in range(start, end):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
         env = NetworkEnvironment(
@@ -17,7 +17,7 @@ def train_upwards(node_id=None, budget=10, num_episodes=100, load_model=False):
             node_id=node_id,
             k=k,
             repeat=False,  # Change to True or False
-            graph_type='scale_free'  # This can be changed to different graph types
+            graph_type='sub_graph'  # This can be changed to different graph types
         )
         print(env)
         env.r_logger = entire_log
@@ -29,13 +29,13 @@ def train_upwards(node_id=None, budget=10, num_episodes=100, load_model=False):
 
         for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
             log = ajay.train()
-            print("E: {}, S: {}, R: {:.2f}".format(episode, k, log.log['tot_return'][-1]))
+            print("E: {}, S: {}, R: {:.4f}".format(episode, k, log.log['tot_reward'][-1]))
         entire_log = log
         load_model = True
         ajay.save_model()  # Save model to reuse and continue to improve on it
         print()
 
-    print('total reward: ', env.r_logger.log['tot_return'])
+    print('total reward: ', env.r_logger.log['tot_reward'])
     print("td error: ", env.r_logger.log['td_error'])
     print("entropy: ", env.r_logger.log['entropy'])
     env.r_logger.plot_logger()

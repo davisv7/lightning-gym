@@ -16,7 +16,7 @@ class GCN(nn.Module):  # Create GCN class
                  n_classes,  # Size of final features vector
                  n_layers,  # Number of layers
                  activation,  # Activation layer Relu in our case
-                 dropout=0.01
+                 dropout=0.05
                  ):
         super(GCN, self).__init__()
 
