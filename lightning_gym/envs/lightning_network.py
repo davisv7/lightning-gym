@@ -201,6 +201,8 @@ class NetworkEnvironment(Env):
         # convert nx_graph for gcn and metrics
         self.ig_g = nx_to_ig(self.nx_graph)
         self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
+        # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['weight']).add_self_loop()
+
 
         self.budget_offset = 0
         self.get_edge_vector_from_node()

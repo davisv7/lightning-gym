@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F
 from random import choice
 from lightning_gym.GCN import GCN
+from lightning_gym.GAT import GAT
 
 
 # from lightning_gym.ACN import ACN
@@ -33,7 +34,8 @@ class DiscreteActorCritic:
         self._test = kwargs.get("test", False)
 
         # create the model for the ajay
-        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
+        # self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
+        self.model = GAT(num_layers=2,in_dim=self.in_feats,num_hidden=self.n_hidden,num_classes=self.n_hidden,heads=[1,1],activation=F.rrelu,feat_drop = 0.01,attn_drop=0.01,negative_slope=0,residual=False)
         # self.acnet = ACN(self.n_hidden)
         if self._load_model:  # making model
             self.load_model()

@@ -6,17 +6,17 @@ from lightning_gym.utils import plot_apsp
 warnings.filterwarnings("ignore")
 
 
-def train_upwards(node_id=None, budget=10, num_episodes=200, load_model=False):
+def train_upwards(node_id=None, budget=10, num_episodes=1000, load_model=False):
     entire_log = Logger()
     start = 6
-    end = start + 7
+    end = start + 1
     for power in range(start, end):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
         env = NetworkEnvironment(
             budget=budget,
             node_id=node_id,
             k=k,
-            repeat=False,  # Change to True or False
+            repeat=True,  # Change to True or False
             graph_type='sub_graph'  # This can be changed to different graph types
         )
         print(env)
