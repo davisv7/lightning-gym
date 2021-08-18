@@ -29,7 +29,7 @@ class DiscreteActorCritic:
         '''
         gamma - defines how the contribution of past rewards are discounted if gamma is 1, then there is no discount
         '''
-        self.learning_rate = kwargs.get("lr", 5e-2)  # this changes the learning rate
+        self.learning_rate = kwargs.get("lr", 1e-2)  # this changes the learning rate
         self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
@@ -56,6 +56,8 @@ class DiscreteActorCritic:
         # self.log.add_log('entropy')
         # self.log.add_log('gains')
 
+        self.actions_taken = []
+
     def print_actor_configuration(self, ):
 
         print("\tLoad model: {}".format(self._load_model),
@@ -73,6 +75,8 @@ class DiscreteActorCritic:
         R = torch.empty(0)  # reward
         V = torch.empty(0)  # value network
 
+        self.actions_taken = []
+
         while not done:  # While we haven't exceeded budget
             # Use this if we have an NVIDIA graphics card (we don't)
             if self.cuda:
@@ -86,6 +90,7 @@ class DiscreteActorCritic:
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
+            self.actions_taken.append(action.item())
 
             # take action
             G, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs

@@ -29,7 +29,8 @@ def train_upwards(node_id=None, budget=10, num_episodes=1000, load_model=False):
 
         for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
             log = ajay.train()
-            print("E: {}, S: {}, R: {:.4f}".format(episode, k, log.log['tot_reward'][-1]))
+            recommendations = [env.index_to_node[index] for index in ajay.actions_taken]
+            print("E: {}, S: {}, R: {:.4f}, N:{}".format(episode, k, log.log['tot_reward'][-1],recommendations))
         entire_log = log
         load_model = True
         ajay.save_model()  # Save model to reuse and continue to improve on it
