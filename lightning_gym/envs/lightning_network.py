@@ -1,3 +1,4 @@
+import networkx as nx
 from gym import Env
 import numpy as np
 from bidict import bidict
@@ -100,11 +101,15 @@ class NetworkEnvironment(Env):
         cc = self.ig_g.closeness(range(self.graph_size))
         c_centralities = torch.Tensor(cc).unsqueeze(-1).nan_to_num(0)
 
+        lc = nx.load_centrality(undirected(self.nx_graph))
+        l_centralities = torch.Tensor([lc[node["name"]] for node in self.ig_g.vs()]).unsqueeze(-1)
+
         'appending 3 features in a tensor'
         self.features = torch.cat((
             b_centralities,
             d_centralities,
             c_centralities,
+            l_centralities,
             self.edge_vector.unsqueeze(-1)), dim=1)
         self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
 
@@ -202,7 +207,6 @@ class NetworkEnvironment(Env):
         self.ig_g = nx_to_ig(self.nx_graph)
         self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
         # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['weight']).add_self_loop()
-
 
         self.budget_offset = 0
         self.get_edge_vector_from_node()

@@ -23,19 +23,19 @@ class DiscreteActorCritic:
         self.path = 'mvc_net.pt'
 
         # hyperparameters
-        self.in_feats = kwargs.get("ndim", 4)  # of node features - equal to length of x in BTWN.py
+        self.in_feats = kwargs.get("ndim", 5)  # of node features - equal to length of x in BTWN.py
         self.n_hidden = kwargs.get("hdim", 256)
         self.gamma = kwargs.get("gamma", 0.99)
         '''
         gamma - defines how the contribution of past rewards are discounted if gamma is 1, then there is no discount
         '''
-        self.learning_rate = kwargs.get("lr", 3e-4)  # this changes the learning rate
+        self.learning_rate = kwargs.get("lr", 5e-2)  # this changes the learning rate
         self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
         # create the model for the ajay
-        # self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
-        self.model = GAT(num_layers=2,in_dim=self.in_feats,num_hidden=self.n_hidden,num_classes=self.n_hidden,heads=[1,1],activation=F.rrelu,feat_drop = 0.01,attn_drop=0.01,negative_slope=0,residual=False)
+        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
+        # self.model = GAT(num_layers=2,in_dim=self.in_feats,num_hidden=self.n_hidden,num_classes=self.n_hidden,heads=[1,1],activation=F.rrelu,feat_drop = 0.01,attn_drop=0.01,negative_slope=0,residual=False)
         # self.acnet = ACN(self.n_hidden)
         if self._load_model:  # making model
             self.load_model()
@@ -100,7 +100,6 @@ class DiscreteActorCritic:
             V = torch.cat([V, val.unsqueeze(0)], dim=0)
 
         tot_return = R.sum().item()
-        self.problem.r_logger.add_log('tot_reward', tot_return)
         # self.log.add_item('gains',np.flip(R.numpy()))
 
         # discount past rewards, rewards of the past are worth less
