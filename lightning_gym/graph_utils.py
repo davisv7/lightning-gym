@@ -53,23 +53,19 @@ def nx_to_ig(nx_graph):
             seen.add((u,v))
         w1 = nx_graph[u][v].get('weight', 1)
         w2 = nx_graph[v][u].get('weight', 1)
-        fee = max(min(w1, w2), 1)
+        fee = max(w1, w2, 1)
         ig_g.add_edge(u, v, weight=fee)
     return ig_g
 
 
 def undirected(nx_graph):
-    seen = []
     undirected_graph = nx.Graph()
     undirected_graph.add_nodes_from(nx_graph.nodes())
     for u, v in nx_graph.edges():
-        if (v, u) in seen:
-            continue
-        else:
-            w1 = nx_graph[u][v].get('weight', 1)
-            w2 = nx_graph[v][u].get('weight', 1)
-            fee = max(w1, w2, 1)
-            undirected_graph.add_edge(u, v, w=fee)
+        w1 = nx_graph[u][v].get('weight', 1)
+        w2 = nx_graph[v][u].get('weight', 1)
+        fee = max(w1, w2, 1)
+        undirected_graph.add_edge(u, v, w=fee)
     return undirected_graph
 
 
