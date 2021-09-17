@@ -15,31 +15,29 @@ from lightning_gym.GAT import GAT
 
 
 class DiscreteActorCritic:
-    def __init__(self, problem, cuda_flag=False, load_model=False, **kwargs):
+    def __init__(self, problem, config, **kwargs):
 
         self.problem = problem  # environment
-        self.cuda = cuda_flag
-        self._load_model = load_model  # if have previous model to pass down
-        self.path = 'mvc_net.pt'
+        self.path = config.get("agent", "model_file")
+        self.cuda = config.getboolean("agent", "cuda")
+        self._load_model = config.getboolean("agent", "load_model")  # if have previous model to pass down
 
         # hyperparameters
-        self.in_feats = kwargs.get("ndim", 5)  # of node features - equal to length of x in BTWN.py
-        self.n_hidden = kwargs.get("hdim", 256)
-        self.gamma = kwargs.get("gamma", 0.99)
-        '''
-        gamma - defines how the contribution of past rewards are discounted if gamma is 1, then there is no discount
-        '''
-        self.learning_rate = kwargs.get("lr", 1e-2)  # this changes the learning rate
+        self.in_feats = config.getint("agent", "in_features")  # of node features - equal to length of x in BTWN.py
+        self.n_hidden = config.getint("agent", "hidden_dimension")
+        self.gamma = config.getfloat("agent", "gamma")
+        self.layers = config.getint("agent", "layers")
+        self.learning_rate = config.getfloat("agent", "learning_rate")  # this changes the learning rate
         self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
         # create the model for the ajay
-        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=3, activation=F.rrelu)
+        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=self.layers, activation=F.rrelu)
         # self.model = GAT(num_layers=2,in_dim=self.in_feats,num_hidden=self.n_hidden,num_classes=self.n_hidden,heads=[1,1],activation=F.rrelu,feat_drop = 0.01,attn_drop=0.01,negative_slope=0,residual=False)
         # self.acnet = ACN(self.n_hidden)
         if self._load_model:  # making model
             self.load_model()
-        if cuda_flag:
+        if self.cuda:
             self.model = self.model.cuda()
 
         # Does optimizer make it work better?
@@ -55,8 +53,6 @@ class DiscreteActorCritic:
         # self.log.add_log('TD_error')
         # self.log.add_log('entropy')
         # self.log.add_log('gains')
-
-        self.actions_taken = []
 
     def print_actor_configuration(self, ):
 
@@ -75,8 +71,6 @@ class DiscreteActorCritic:
         R = torch.empty(0)  # reward
         V = torch.empty(0)  # value network
 
-        self.actions_taken = []
-
         while not done:  # While we haven't exceeded budget
             # Use this if we have an NVIDIA graphics card (we don't)
             if self.cuda:
@@ -90,7 +84,6 @@ class DiscreteActorCritic:
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
-            self.actions_taken.append(action.item())
 
             # take action
             G, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs

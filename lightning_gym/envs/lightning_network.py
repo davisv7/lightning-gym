@@ -21,11 +21,33 @@ from functools import reduce
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
 
+"""
+
+Reinforcement Learning Formulation
+
+State:
+a state S is a sequence of actions (nodes) on graph G, 
+
+Transition:
+
+Actions:
+
+Rewards:
+
+Policy:
+
+
+
+
+
+
+"""
+
 
 # Environment Class
 class NetworkEnvironment(Env):
 
-    def __init__(self, budget=10, node_id=None, **kwargs):
+    def __init__(self, config, **kwargs):
         """
         :param
         budget: number of channels that can add to graph
@@ -42,8 +64,11 @@ class NetworkEnvironment(Env):
         k: size of subgraph
         params = kwards: pass keywords
         """
-        self.budget = budget
-        self.node_id = node_id
+        self.budget = config.getint("env", "budget")
+        self.node_id = config.get("env", "node_id")
+        self.repeat = config.getboolean("env", "repeat")
+        self.graph_type = config["env"]["graph_type"]
+
         self.index_to_node = bidict()
         self.r_logger = Logger()
         self.node_index = None
@@ -51,16 +76,15 @@ class NetworkEnvironment(Env):
         self.dgl_g = None
         self.graph_size = None
         self.btwn_cent = 0
-        self.edge_vector = None
+        self.node_vector = None
         self.features = None
         self.budget_offset = 0
         self.nx_graph = None
         self.base_graph = None
         self.norm = None
         self.num_actions = 0
+        self.actions_taken = []
         self.k = kwargs.get("k", None)
-        self.repeat = kwargs.get("repeat", False)
-        self.graph_type = kwargs.get('graph_type', 'scale_free')
         assert self.graph_type in ['sub_graph', 'snapshot', 'scale_free'], \
             """You must use one of the following graphs types:
                                                         sub_graph, 
@@ -70,9 +94,10 @@ class NetworkEnvironment(Env):
     def __str__(self):
         return \
             """Configurations:
-              "Graph Type: {}
-              "Budget: {}
-              "Repeat State: {}""".format(self.graph_type, self.budget, self.repeat)
+              Budget: {}
+              Node ID: {}
+              Graph Type: {}
+              Repeat State: {}""".format(self.budget, self.node_id, self.graph_type, self.repeat)
 
     def get_features(self):
         '''
@@ -82,23 +107,23 @@ class NetworkEnvironment(Env):
         could have considerable more influence.
         '''
         weights = self.ig_g.es["weight"]
-        norm = (self.graph_size * (self.graph_size - 1) / 2)
-        w_norm = sum(weights)
+        # norm = (self.graph_size * (self.graph_size - 1) / 2)
+        # w_norm = sum(weights)
         indices = self.ig_g.vs().indices
-        b_centralities = np.array(self.ig_g.betweenness(indices, weights=weights)) / norm
-        b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)  # makes list smaller size
+        # b_centralities = np.array(self.ig_g.betweenness(indices, weights=weights)) / norm
+        # b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)  # makes list smaller size
 
         '''Initialize Algorithm
         Indicates how close a node is to all other nodes in the network. 
         '''
-        dc = np.zeros(shape=self.graph_size)
-        for i, node in enumerate(self.ig_g.vs()):
-            incident_weights = self.ig_g.es.select(_source=[node])["weight"]
-            dc[i] = sum(incident_weights) / w_norm
+        # dc = np.zeros(shape=self.graph_size)
+        # for i, node in enumerate(self.ig_g.vs()):
+        #     incident_weights = self.ig_g.es.select(_source=[node])["weight"]
+        #     dc[i] = sum(incident_weights) / w_norm
 
-        d_centralities = torch.Tensor(dc).unsqueeze(-1)
+        # d_centralities = torch.Tensor(dc).unsqueeze(-1)
 
-        cc = self.ig_g.closeness(range(self.graph_size))
+        cc = self.ig_g.closeness(indices, weights=weights)
         c_centralities = torch.Tensor(cc).unsqueeze(-1).nan_to_num(0)
 
         lc = nx.load_centrality(undirected(self.nx_graph))
@@ -106,27 +131,27 @@ class NetworkEnvironment(Env):
 
         'appending 3 features in a tensor'
         self.features = torch.cat((
-            b_centralities,
-            d_centralities,
+            # b_centralities,
+            # d_centralities,
             c_centralities,
             l_centralities,
-            self.edge_vector.unsqueeze(-1)), dim=1)
+            self.node_vector.unsqueeze(-1)), dim=1)
         self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
 
     def step(self, action: int):  # make action and give reward
         done = False
-        if self.edge_vector[action] == 1:  # if find neighbor = no reward (don't need node)
+        if self.node_vector[action] == 1:  # if find neighbor = no reward (don't need node)
             '''
             right now, selecting na index twice doesnt do anything
             what if selecting an index twice removed the channel? increment budget, reward is negative change
             '''
             # reward = 0
-            self.edge_vector[action] = 0  # mark channel for deletion
+            self.node_vector[action] = 0  # mark channel for deletion
             self.take_action(action, remove=True)
-            reward = 1.01 * self.get_reward()
+            # reward = 1.01 * self.get_reward()
         else:
             # reward = 0
-            self.edge_vector[action] = 1  # mark as explored in edge vector
+            self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
             reward = self.get_reward()
 
@@ -140,8 +165,8 @@ class NetworkEnvironment(Env):
         return self.dgl_g, reward, done, info  # Tensor so we can take it and appending
 
     def get_illegal_actions(self):  # tells Ajay to not look at neighbors as an action
-        illegal = (self.edge_vector == 1.).nonzero()  # if neighbor of node = illegal
-        legal = (self.edge_vector == 0.).nonzero()
+        illegal = (self.node_vector == 1.).nonzero()  # if neighbor of node = illegal
+        legal = (self.node_vector == 0.).nonzero()
         return illegal, legal
 
     def get_reward(self):  # if add node, what is the betweeness centrality?
@@ -174,6 +199,7 @@ class NetworkEnvironment(Env):
             self.num_actions += 1
 
         self.dgl_g.ndata['features'] = self.features
+        self.actions_taken.append(action)
 
     def reset(self):
         if self.repeat and self.base_graph is not None:
@@ -212,6 +238,7 @@ class NetworkEnvironment(Env):
         self.get_edge_vector_from_node()
 
         self.num_actions = 0
+        self.actions_taken = []
 
         self.get_features()
 
@@ -253,7 +280,7 @@ class NetworkEnvironment(Env):
 
     def get_edge_vector_from_node(self):
         # Create a vector of zeros to the length of the graph_size
-        self.edge_vector = torch.zeros(self.graph_size)
+        self.node_vector = torch.zeros(self.graph_size)
 
         if self.node_id is not None:
             # for edge in self.nx_graph.edges():  # trying to find neighbors of node
@@ -265,10 +292,10 @@ class NetworkEnvironment(Env):
             if incident_edges:
                 vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
                 vertices = vertices[vertices != self.node_index].type(torch.long)
-                self.edge_vector = self.edge_vector.put(vertices, torch.ones(len(vertices)))
+                self.node_vector = self.node_vector.put(vertices, torch.ones(len(vertices)))
                 self.budget_offset = len(vertices)
 
-        return self.edge_vector
+        return self.node_vector
 
     def generate_subgraph(self):
         if self.k >= len(self.nx_graph):
@@ -300,3 +327,6 @@ class NetworkEnvironment(Env):
         self.node_id = node_id
         self.node_index = len(self.nx_graph)
         self.nx_graph.add_node(self.node_id)
+
+    def get_recommendations(self):
+        return sorted([self.index_to_node[index] for index in self.actions_taken])

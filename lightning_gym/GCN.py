@@ -44,7 +44,7 @@ class GCN(nn.Module):  # Create GCN class
             #     h = self.dropout(h)
             h = layer(g, h)  # Features after they been convoluted
         g.ndata['h'] = h
-        mN = readout_nodes(g, 'h', op="mean")  # Sum of those three features
+        mN = readout_nodes(g, 'h', op="mean")  # max of those features
         PI = self.policy(h)  # Distribution of actions
         V = self.value(mN)
         g.ndata.pop('h')
