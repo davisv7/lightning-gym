@@ -1,7 +1,8 @@
 import networkx as nx
-from os import path
+from os import path, getcwd
 import igraph as ig
-from .utils import SAMPLEDIRECTORY, get_random_filename, load_json
+from .utils import get_random_filename
+from ln_graph_utils.ln_graph_utils import load_json
 
 
 def make_nx_graph(nodes, edges):
@@ -26,7 +27,18 @@ def get_random_snapshot():
     """
     # make random graph
     randomfilename = get_random_filename()
-    nodes, edges = load_json(path.join(SAMPLEDIRECTORY, randomfilename))
+    nodes, edges = load_json(path.join(getcwd(), randomfilename))
+    # Create nx_graph
+    return make_nx_graph(nodes, edges)
+
+
+def get_snapshot(filename):
+    """
+    Get a random graph filename, load it, and return it as an nx_graph type
+    :return:
+    """
+    # make random graph
+    nodes, edges = load_json(path.join(getcwd(), filename))
     # Create nx_graph
     return make_nx_graph(nodes, edges)
 
@@ -47,10 +59,10 @@ def nx_to_ig(nx_graph):
         ig_g.add_vertex(name=node)
     seen = set()
     for u, v in nx_graph.edges():
-        if (v,u) in seen:
+        if (v, u) in seen:
             continue
         else:
-            seen.add((u,v))
+            seen.add((u, v))
         w1 = nx_graph[u][v].get('weight', 1)
         w2 = nx_graph[v][u].get('weight', 1)
         fee = max(w1, w2, 1)

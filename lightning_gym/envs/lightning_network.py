@@ -1,8 +1,6 @@
-import networkx as nx
 from gym import Env
 import numpy as np
 from bidict import bidict
-from ..utils import *
 import dgl
 import torch
 import random
@@ -54,9 +52,9 @@ class NetworkEnvironment(Env):
         node_index: node parameter that want to test on
         ig_g: igraph graph
         dgl_g: dgl graph
-        btwn_cent: betweeness centrality
+        btwn_cent: betweenness centrality
         edge_vector: neighbors of a node, (1=neighbor, 0=not neighbor)
-        features: betweeness, degree, closeness, edge vector
+        features: betweenness, degree, closeness, edge vector
         r_logger: keeps track of reward
         repeat: whether or not to repeat
         budget_offset: how many edges the nodes started off with
@@ -68,6 +66,7 @@ class NetworkEnvironment(Env):
         self.node_id = config.get("env", "node_id")
         self.repeat = config.getboolean("env", "repeat")
         self.graph_type = config.get("env", "graph_type")
+        self.filename = config.get("env", "filename")
 
         self.index_to_node = bidict()
         self.r_logger = Logger()
@@ -80,7 +79,7 @@ class NetworkEnvironment(Env):
         self.features = None
         self.budget_offset = 0
         self.nx_graph = None
-        self.base_graph = None
+        self.base_graph = kwargs.get("g", None)
         self.norm = None
         self.num_actions = 0
         self.actions_taken = []
@@ -204,8 +203,18 @@ class NetworkEnvironment(Env):
             # reload
             self.nx_graph = deepcopy(self.base_graph)
         else:
-            if self.graph_type == 'snapshot':
-                self.nx_graph = get_random_snapshot()
+            if self.base_graph is not None:
+                self.nx_graph = self.base_graph
+                if self.node_id not in ["", None, self.k]:
+                    self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
+                    self.node_index = self.index_to_node.inverse[self.node_id]
+                else:
+                    self.add_node("")
+            elif self.graph_type == 'snapshot':
+                if self.filename:
+                    self.nx_graph = get_snapshot(self.filename)
+                else:
+                    self.nx_graph = get_random_snapshot()
                 if self.node_id not in ["", None, self.k]:
                     self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
                     self.node_index = self.index_to_node.inverse[self.node_id]
@@ -286,7 +295,7 @@ class NetworkEnvironment(Env):
             #         neighbor_index = self.index_to_node.inverse[edge[1]]
             #         self.edge_vector[neighbor_index] = 1
             #         self.budget_offset += 1  # update budget, discount if have neighbor
-            incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_index])]
+            incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
             if incident_edges:
                 vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
                 vertices = vertices[vertices != self.node_index].type(torch.long)
