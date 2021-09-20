@@ -22,25 +22,25 @@ CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
 
 """
-
 Reinforcement Learning Formulation
 
 State:
 a state S is a sequence of actions (nodes) on graph G, 
+nodes are represented by their embeddings so the state vector is p-dimensional
 
 Transition:
+tag nodes selected as asction x_v=1 x_v is feature x of node v
 
 Actions:
+action v is a node in graph G that is not part of s
+actions are nodes represented by their embeddings
 
 Rewards:
+r(S,v) = c(h(S'),G)-c(h(S),G) 
+reward of taking action v in state S is the change in betweenness after adding v to S
 
 Policy:
-
-
-
-
-
-
+pi(v|S) := argmax_(v' in S^bar)(Q_hat(h(S),v')
 """
 
 
