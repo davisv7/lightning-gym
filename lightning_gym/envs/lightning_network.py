@@ -67,7 +67,7 @@ class NetworkEnvironment(Env):
         self.budget = config.getint("env", "budget")
         self.node_id = config.get("env", "node_id")
         self.repeat = config.getboolean("env", "repeat")
-        self.graph_type = config["env"]["graph_type"]
+        self.graph_type = config.get("env", "graph_type")
 
         self.index_to_node = bidict()
         self.r_logger = Logger()
@@ -85,11 +85,9 @@ class NetworkEnvironment(Env):
         self.num_actions = 0
         self.actions_taken = []
         self.k = kwargs.get("k", None)
-        assert self.graph_type in ['sub_graph', 'snapshot', 'scale_free'], \
-            """You must use one of the following graphs types:
-                                                        sub_graph, 
-                                                        snapshot,
-                                                        scale_free"""
+        valid_types = ['sub_graph', 'snapshot', 'scale_free']
+        assert self.graph_type in valid_types, "\nYou must use one of the following graphs types:\n\t{}".format(
+            ',\n\t'.join(valid_types))
 
     def __str__(self):
         return \
@@ -170,7 +168,7 @@ class NetworkEnvironment(Env):
         return illegal, legal
 
     def get_reward(self):  # if add node, what is the betweeness centrality?
-        new_btwn = self.ig_g.betweenness(self.node_id, weights=self.ig_g.es["weight"]) / self.norm
+        new_btwn = -self.ig_g.betweenness(self.node_id, weights=self.ig_g.es["weight"]) / self.norm
         # new_btwn = self.get_triangles()
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
@@ -184,7 +182,7 @@ class NetworkEnvironment(Env):
             nbrs = nbrs[nbrs != self.node_index]
             nbrsnbrs = self.ig_g.es.select(_between=(nbrs, nbrs))
             triangles = len(nbrsnbrs)
-        return triangles
+        return -triangles
 
     def take_action(self, action, remove=False):
         neighbor_index = action
@@ -194,7 +192,7 @@ class NetworkEnvironment(Env):
             self.features[action, -1] = 0
             self.num_actions -= 1
         else:
-            self.ig_g.add_edge(neighbor_id, self.node_id, weight=1)
+            self.ig_g.add_edge(neighbor_id, self.node_id, weight=0.001)
             self.features[action, -1] = 1
             self.num_actions += 1
 
@@ -245,7 +243,7 @@ class NetworkEnvironment(Env):
         weights = self.ig_g.es["weight"]
         self.norm = (self.graph_size * (self.graph_size - 1) / 2)
         self.w_norm = sum(weights)
-        self.btwn_cent = self.ig_g.betweenness(self.node_id, weights=weights) / self.norm
+        self.btwn_cent = -self.ig_g.betweenness(self.node_id, weights=weights) / self.norm
         # self.btwn_cent = self.get_triangles()
         return self.dgl_g
 

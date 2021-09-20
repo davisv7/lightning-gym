@@ -1,17 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Dec 30 16:20:39 2018
-
-@author: orrivlin
-"""
 import torch
 import torch.nn.functional as F
-from random import choice
 from lightning_gym.GCN import GCN
-from lightning_gym.GAT import GAT
-
-
-# from lightning_gym.ACN import ACN
 
 
 class DiscreteActorCritic:
@@ -33,8 +22,6 @@ class DiscreteActorCritic:
 
         # create the model for the ajay
         self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=self.layers, activation=F.rrelu)
-        # self.model = GAT(num_layers=2,in_dim=self.in_feats,num_hidden=self.n_hidden,num_classes=self.n_hidden,heads=[1,1],activation=F.rrelu,feat_drop = 0.01,attn_drop=0.01,negative_slope=0,residual=False)
-        # self.acnet = ACN(self.n_hidden)
         if self._load_model:  # making model
             self.load_model()
         if self.cuda:
@@ -47,12 +34,6 @@ class DiscreteActorCritic:
         # ], lr=self.learning_rate)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        # logs information about trials/networks
-        # self.log = logger()
-        # self.log.add_log('tot_return')
-        # self.log.add_log('TD_error')
-        # self.log.add_log('entropy')
-        # self.log.add_log('gains')
 
     def print_actor_configuration(self, ):
 
