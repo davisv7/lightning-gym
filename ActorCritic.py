@@ -1,40 +1,30 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Dec 30 16:20:39 2018
-
-@author: orrivlin
-"""
 import torch
 import torch.nn.functional as F
 from lightning_gym.GCN import GCN
-from lightning_gym.ACN import ACN
 
 
 class DiscreteActorCritic:
-    def __init__(self, problem, cuda_flag=False, load_model=False, **kwargs):
+    def __init__(self, problem, config, **kwargs):
 
         self.problem = problem  # environment
-        self.cuda = cuda_flag
-        self._load_model = load_model  # if have previous model to pass down
-        self.path = 'mvc_net.pt'
+        self.path = config.get("agent", "model_file")
+        self.cuda = config.getboolean("agent", "cuda")
+        self._load_model = config.getboolean("agent", "load_model")  # if have previous model to pass down
 
         # hyperparameters
-        self.in_feats = kwargs.get("ndim", 4)  # of node features - equal to length of x in BTWN.py
-        self.n_hidden = kwargs.get("hdim", 256)
-        self.gamma = kwargs.get("gamma", 0.99)
-        '''
-        gamma - defines how the contribution of past rewards are discounted if gamma is 1, then there is no discount
-        '''
-        self.learning_rate = kwargs.get("lr", 1.5e-3)  # this changes the learning rate
+        self.in_feats = config.getint("agent", "in_features")  # of node features - equal to length of x in BTWN.py
+        self.n_hidden = config.getint("agent", "hidden_dimension")
+        self.gamma = config.getfloat("agent", "gamma")
+        self.layers = config.getint("agent", "layers")
+        self.learning_rate = config.getfloat("agent", "learning_rate")  # this changes the learning rate
         self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
         self._test = kwargs.get("test", False)
 
         # create the model for the ajay
-        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=4, activation=F.leaky_relu)
-        # self.acnet = ACN(self.n_hidden)
+        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=self.layers, activation=F.rrelu)
         if self._load_model:  # making model
             self.load_model()
-        if cuda_flag:
+        if self.cuda:
             self.model = self.model.cuda()
 
         # Does optimizer make it work better?
@@ -44,12 +34,6 @@ class DiscreteActorCritic:
         # ], lr=self.learning_rate)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        # logs information about trials/networks
-        # self.log = logger()
-        # self.log.add_log('tot_return')
-        # self.log.add_log('TD_error')
-        # self.log.add_log('entropy')
-        # self.log.add_log('gains')
 
     def print_actor_configuration(self, ):
 
@@ -95,7 +79,6 @@ class DiscreteActorCritic:
             V = torch.cat([V, val.unsqueeze(0)], dim=0)
 
         tot_return = R.sum().item()
-        self.problem.r_logger.add_log('tot_return', tot_return)
         # self.log.add_item('gains',np.flip(R.numpy()))
 
         # discount past rewards, rewards of the past are worth less
@@ -120,6 +103,7 @@ class DiscreteActorCritic:
             action = dist.probs.argmax()
         else:
             action = dist.sample()
+            # action = choice([dist.probs.argmax, dist.sample])()
         return action
 
     def update_model(self, PI, R, V):
