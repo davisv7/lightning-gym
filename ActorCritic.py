@@ -34,19 +34,16 @@ class DiscreteActorCritic:
         # ], lr=self.learning_rate)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-
-    def print_actor_configuration(self, ):
-
+    def print_actor_configuration(self):
         print("\tLoad model: {}".format(self._load_model),
               "Learning Rate: {}".format(self.learning_rate),
-              sep="\n\t"
-              )
+              sep="\n\t")
 
     def run_episode(self):  # similar to epochs
         done = False
         G = self.problem.reset()  # We get our initial state by resetting
         # Add our illegal actions which are ones in the edge vector
-        [illegal_actions, _] = self.problem.get_illegal_actions()  # getting neighbors
+        illegal_actions = self.problem.get_illegal_actions()  # getting neighbors
         # Initialize the list below
         PI = torch.empty(0)  # policy network
         R = torch.empty(0)  # reward
@@ -68,7 +65,7 @@ class DiscreteActorCritic:
 
             # take action
             G, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs
-            [illegal_actions, _] = self.problem.get_illegal_actions()
+            illegal_actions = self.problem.get_illegal_actions()
 
             # collect outputs of networks for learning - cat = appending for tensors
             # Probability for taking action
