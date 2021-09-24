@@ -27,7 +27,7 @@ def main():
     # clean edges
     edge_filters = config["edge_filters"]
     active_edges = clean_edges(edges, edge_filters)
-    active_edges = get_channels_with_fees(active_edges)
+    active_edges = get_channels_with_attrs(active_edges)
 
     # Create graph
     g = nx.MultiDiGraph()
@@ -43,7 +43,7 @@ def main():
 
     """
     at this point, we should have a graph with the following properties:
-    - no multi-edges, in favor of whichever edge has the lowest weight
+    - no multi-edges, in favor of whichever edge has the highest cost, capacities are combined
     - nodes whose degree is >= 2
     - nodes/edges whose deletion will not create a subgraph
     - nodes whose adjacent edges all have cycles
@@ -53,6 +53,7 @@ def main():
 
     # create an environment, an agent, and then train for some number of episodes
     env = NetworkEnvironment(config, g=g)
+    # env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
 
     num_episodes = config.getint("training", "episodes")
