@@ -10,6 +10,7 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 from ..graph_utils import *
 from functools import reduce
+from os import getcwd, path
 
 '''
     Get the current directory.
@@ -85,6 +86,8 @@ class NetworkEnvironment(Env):
         self.num_actions = 0
         self.k = config.getint("env", "k", fallback=None)
         self.action_mask = None
+        self.default_node_ids = ["", None, self.k]
+        self.hop_limit = 20  # the lnd protocol does not allow payments with more than 20 intermediaries
         valid_types = ['sub_graph', 'snapshot', 'random_snapshot', 'scale_free']
         assert self.graph_type in valid_types, "\nYou must use one of the following graphs types:\n\t{}".format(
             ',\n\t'.join(valid_types))
@@ -98,31 +101,35 @@ class NetworkEnvironment(Env):
               Repeat State: {}""".format(self.budget, self.node_id, self.graph_type, self.repeat)
 
     def get_features(self):
-        '''
-        Initialize Algorithm
-        Measures the extent to which a node lies on shortest
-        paths between other nodes. Nodes with high betweeness
-        could have considerable more influence.
-        '''
-        weights = self.ig_g.es["weight"]
+        """
+        Assigns to each node a feature vector containing including but not limited to:
+        closeness centrality: the average cost to send funds to/from this node from/to other nodes in the network
+        degree centrality: the fraction of edges incident to the node relative to the total number of edges
+        load centrality: similar to betweenness centrality, except it only considers one cheapest path versus all
+        strengths: sum of out weights divided the max of the sum of these outweights
+        :return:
+        """
+        # costs = self.ig_g.es["cost"]
+        node_indices = self.ig_g.vs().indices
         # norm = (self.graph_size * (self.graph_size - 1) / 2)
-        # w_norm = sum(weights)
-        indices = self.ig_g.vs().indices
-        # b_centralities = np.array(self.ig_g.betweenness(indices, weights=weights)) / norm
-        # b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)  # makes list smaller size
+        # w_norm = sum(costs)
+        # b_centralities = np.array(self.ig_g.betweenness(node_indices, weights=costs)) / norm
+        # b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)
 
-        '''Initialize Algorithm
-        Indicates how close a node is to all other nodes in the network. 
-        '''
+        degrees = self.ig_g.degree(vertices=node_indices, mode="out", loops=False)
         dc = np.zeros(shape=self.graph_size)
-        degree_sum = len(self.nx_graph.edges()) // 2
-        for i, node in enumerate(self.nx_graph.nodes()):
-            degree = self.nx_graph.degree(node)
-            degree_centrality = degree / degree_sum
-            dc[i] = degree_centrality
+        total_degree = len(self.ig_g.es) // 2
+        for node in node_indices:
+            degree = degrees[node]
+            degree_centrality = degree / total_degree
+            dc[node] = degree_centrality
         d_centralities = torch.Tensor(dc).unsqueeze(-1)
 
-        cc = self.ig_g.closeness(indices, weights=weights)
+        ns = self.ig_g.strength(node_indices, mode="out", loops=False, weights="cost")
+        ns = ns / np.max(ns)
+        strengths = torch.Tensor(ns).unsqueeze(-1).nan_to_num(0)
+
+        cc = self.ig_g.closeness(vertices=node_indices, mode="all", weights="cost")
         c_centralities = torch.Tensor(cc).unsqueeze(-1).nan_to_num(0)
 
         lc = nx.load_centrality(undirected(self.nx_graph))
@@ -134,8 +141,68 @@ class NetworkEnvironment(Env):
             d_centralities,
             c_centralities,
             l_centralities,
+            strengths,
             self.node_vector.unsqueeze(-1)), dim=1)
         self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
+
+    def get_illegal_actions(self):  # tells Ajay to not look at neighbors as an action
+        illegal = ((self.node_vector + self.action_mask) > 0.).nonzero()  # if neighbor of node = illegal
+        return illegal
+
+    def get_reward(self):  # if add node, what is the betweeness centrality?
+        new_btwn = self.ig_g.betweenness(self.node_id,  weights=self.ig_g.es["cost"]) / self.norm
+        # new_btwn = -self.ig_g.betweenness(self.node_id) / self.norm
+        # new_btwn = self.get_triangles()
+        reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
+        self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
+        return -reward
+
+    def get_triangles(self):
+        triangles = 0
+        incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_index])]
+        if incident_edges:
+            nbrs = np.unique(reduce(lambda x, y: x + y, incident_edges))
+            nbrs = nbrs[nbrs != self.node_index]
+            nbrsnbrs = self.ig_g.es.select(_between=(nbrs, nbrs))
+            triangles = len(nbrsnbrs)
+        return -triangles
+
+    def get_recommendations(self):
+        actions_taken = (self.node_vector == 1).nonzero()
+        return sorted([self.index_to_node[index.item()] for index in actions_taken])
+
+    def get_action_mask(self):
+        if self.action_mask is not None:
+            return
+        else:
+            if self.graph_type == "scale_free":
+                self.action_mask = np.zeros(self.graph_size)
+            else:
+                candidate_filters = self.config["action_mask"]
+                self.action_mask = np.zeros(self.graph_size)
+                min_degree = candidate_filters.getint("minimum_channels", 0)
+                min_avg_cap = candidate_filters.getint("min_avg_capacity", 0)
+                # min_reliability = candidate_filters.getfloat("min_reliability", None)
+                for i, node in enumerate(self.nx_graph.nodes()):
+                    degree = self.nx_graph.degree(node)
+                    if node in self.default_node_ids:
+                        continue
+                    incident_capacities = [self.nx_graph[node][n]["capacity"] for n in self.nx_graph.neighbors(node)]
+                    total_capacity = sum(incident_capacities)
+                    avg_capacity = total_capacity / degree
+                    if degree < min_degree:
+                        self.action_mask[i] = 1
+                        continue
+                    if avg_capacity < min_avg_cap:
+                        self.action_mask[i] = 1
+                        continue
+                    # if min_reliability:
+                    #     reliability = get_reliability(node)
+                    #     if reliability < min_reliability:
+                    #         action_mask[i] = 1
+                    #         continue
+        # make sure we cannot select our own node
+        self.action_mask[self.index_to_node.inverse[self.node_id]] = 1
 
     def step(self, action: int):  # make action and give reward
         done = False
@@ -163,28 +230,6 @@ class NetworkEnvironment(Env):
         reward = torch.Tensor([reward])
         return self.dgl_g, reward, done, info  # Tensor so we can take it and appending
 
-    def get_illegal_actions(self):  # tells Ajay to not look at neighbors as an action
-        illegal = ((self.node_vector + self.action_mask) > 0.).nonzero()  # if neighbor of node = illegal
-        return illegal
-
-    def get_reward(self):  # if add node, what is the betweeness centrality?
-        # new_btwn = self.ig_g.betweenness(self.node_id, weights=self.ig_g.es["weight"]) / self.norm
-        new_btwn = -self.ig_g.betweenness(self.node_id) / self.norm
-        # new_btwn = self.get_triangles()
-        reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
-        self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
-        return reward
-
-    def get_triangles(self):
-        triangles = 0
-        incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_index])]
-        if incident_edges:
-            nbrs = np.unique(reduce(lambda x, y: x + y, incident_edges))
-            nbrs = nbrs[nbrs != self.node_index]
-            nbrsnbrs = self.ig_g.es.select(_between=(nbrs, nbrs))
-            triangles = len(nbrsnbrs)
-        return -triangles
-
     def take_action(self, action, remove=False):
         neighbor_index = action
         neighbor_id = self.index_to_node[neighbor_index]
@@ -193,24 +238,24 @@ class NetworkEnvironment(Env):
             self.features[action, -1] = 0
             self.num_actions -= 1
         else:
-            self.ig_g.add_edge(neighbor_id, self.node_id, weight=0.001)
+            self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
             self.features[action, -1] = 1
             self.num_actions += 1
 
         self.dgl_g.ndata['features'] = self.features
 
     def reset(self):
-        if self.repeat and self.base_graph is not None:
+        if self.repeat and self.nx_graph is not None:
             # reload
             self.nx_graph = deepcopy(self.base_graph)
         else:
-            if self.graph_type == 'snapshot' and self.base_graph is not None:
+            if self.graph_type == 'snapshot':
                 if self.base_graph is not None:
                     self.nx_graph = self.base_graph
                 elif self.filename:
                     self.nx_graph = get_snapshot(self.filename)
 
-                if self.node_id not in ["", None, self.k]:
+                if self.node_id not in self.default_node_ids:
                     self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
                     self.node_index = self.index_to_node.inverse[self.node_id]
                 else:
@@ -234,20 +279,20 @@ class NetworkEnvironment(Env):
         # convert nx_graph for gcn and metrics
         self.ig_g = nx_to_ig(self.nx_graph)
         self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
-        # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['weight']).add_self_loop()
+        # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['cost','capacity']).add_self_loop()
 
         self.budget_offset = 0
         self.get_edge_vector_from_node()
-        self.create_action_mask()
+        self.get_action_mask()
 
         self.num_actions = 0
 
         self.get_features()
 
-        weights = self.ig_g.es["weight"]
+        costs = self.ig_g.es["cost"]
         self.norm = (self.graph_size * (self.graph_size - 1) / 2)
-        self.w_norm = sum(weights)
-        # self.btwn_cent = self.ig_g.betweenness(self.node_id, weights=weights) / self.norm
+        self.w_norm = sum(costs)
+        # self.btwn_cent = self.ig_g.betweenness(self.node_id, weights=costs) / self.norm
         self.btwn_cent = 0
         # self.btwn_cent = self.get_triangles()
         return self.dgl_g
@@ -285,19 +330,13 @@ class NetworkEnvironment(Env):
         # Create a vector of zeros to the length of the graph_size
         self.node_vector = torch.zeros(self.graph_size)
 
-        if self.node_id is not None:
-            # for edge in self.nx_graph.edges():  # trying to find neighbors of node
-            #     if edge[0] == self.node_id:
-            #         neighbor_index = self.index_to_node.inverse[edge[1]]
-            #         self.edge_vector[neighbor_index] = 1
-            #         self.budget_offset += 1  # update budget, discount if have neighbor
+        if self.node_id not in self.default_node_ids:
             incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
             if incident_edges:
                 vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
                 vertices = vertices[vertices != self.node_index].type(torch.long)
                 self.node_vector = self.node_vector.put(vertices, torch.ones(len(vertices)))
                 self.budget_offset = len(vertices)
-
         return self.node_vector
 
     def generate_subgraph(self):
@@ -330,33 +369,3 @@ class NetworkEnvironment(Env):
         self.node_id = node_id
         self.node_index = len(self.nx_graph)
         self.nx_graph.add_node(self.node_id)
-
-    def get_recommendations(self):
-        actions_taken = (self.node_vector == 1).nonzero()
-        return sorted([self.index_to_node[index.item()] for index in actions_taken])
-
-    def create_action_mask(self):
-        if self.action_mask is not None:
-            return
-        elif self.graph_type != "scale_free":
-            self.action_mask = np.zeros(self.graph_size)
-            return
-        candidate_filters = self.config["action_mask"]
-        self.action_mask = np.zeros(self.graph_size)
-        min_degree = candidate_filters.getint("minimum_channels", 0)
-        min_avg_cap = candidate_filters.getint("min_avg_capacity", 0)
-        min_reliability = candidate_filters.getfloat("min_reliability", None)
-        for i, node in enumerate(self.nx_graph.nodes()):
-            # total_capacity = sum([self.nx_graph[node][n]["capacity"] for n in self.nx_graph.neighbors(node)])
-            degree = self.nx_graph.degree(node)
-            if degree < min_degree:
-                self.action_mask[i] = 1
-                continue
-            # if total_capacity / degree < min_avg_cap:
-            #     self.action_mask[i] = 1
-            #     continue
-            # if min_reliability:
-            #     reliability = get_reliability(node)
-            #     if reliability < min_reliability:
-            #         action_mask[i] = 1
-            #         continue
