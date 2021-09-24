@@ -50,7 +50,7 @@ def random_scale_free(k):
 def nx_to_ig(nx_graph):
     """
     Given an nx_graph, convert it to an igraph.
-    Nondirected, new fee is the min between
+    Directed, new cost is the max between
     :param nx_graph:
     :return:
     """
@@ -63,10 +63,12 @@ def nx_to_ig(nx_graph):
             continue
         else:
             seen.add((u, v))
-        w1 = nx_graph[u][v].get('weight', 1)
-        w2 = nx_graph[v][u].get('weight', 1)
-        fee = max(w1, w2, 1)
-        ig_g.add_edge(u, v, weight=fee)
+        c1 = nx_graph[u][v].get('cost', 0.1)
+        c2 = nx_graph[v][u].get('cost', 0.1)
+        capacity = nx_graph[u][v].get('capacity')
+        cost = max(c1, c2, 1)
+        ig_g.add_edges([(u, v)], {'cost': [cost], 'capacity': [capacity]})  # slightly less overhead than add_edge
+        ig_g.add_edges([(v, u)], {'cost': [cost], 'capacity': [capacity]})
     return ig_g
 
 
@@ -74,10 +76,11 @@ def undirected(nx_graph):
     undirected_graph = nx.Graph()
     undirected_graph.add_nodes_from(nx_graph.nodes())
     for u, v in nx_graph.edges():
-        w1 = nx_graph[u][v].get('weight', 1)
-        w2 = nx_graph[v][u].get('weight', 1)
-        fee = max(w1, w2, 1)
-        undirected_graph.add_edge(u, v, w=fee)
+        c1 = nx_graph[u][v].get('cost', 0.1)
+        c2 = nx_graph[v][u].get('cost', 0.1)
+        capacity = nx_graph[u][v].get('capacity')
+        cost = max(c1, c2, 1)
+        undirected_graph.add_edge(u, v, cost=cost, capacity=capacity)
     return undirected_graph
 
 
