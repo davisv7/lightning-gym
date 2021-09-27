@@ -3,11 +3,8 @@ import numpy as np
 from bidict import bidict
 import dgl
 import torch
-import random
 from ..Logger import Logger
-from random import shuffle
 from copy import deepcopy
-import matplotlib.pyplot as plt
 from ..graph_utils import *
 from functools import reduce
 from os import getcwd, path
@@ -59,7 +56,6 @@ class NetworkEnvironment(Env):
         r_logger: keeps track of reward
         repeat: whether or not to repeat
         budget_offset: how many edges the nodes started off with
-        nx_graph: networkX graph
         k: size of subgraph
         params = kwards: pass keywords
         """
@@ -80,7 +76,6 @@ class NetworkEnvironment(Env):
         self.node_vector = None
         self.features = None
         self.budget_offset = 0
-        self.nx_graph = None
         self.base_graph = kwargs.get("g", None)
         self.norm = None
         self.num_actions = 0
@@ -88,7 +83,7 @@ class NetworkEnvironment(Env):
         self.action_mask = None
         self.default_node_ids = ["", None, self.k]
         self.hop_limit = 20  # the lnd protocol does not allow payments with more than 20 intermediaries
-        valid_types = ['sub_graph', 'snapshot', 'random_snapshot', 'scale_free']
+        valid_types = ['snapshot', 'random_snapshot', 'scale_free']
         assert self.graph_type in valid_types, "\nYou must use one of the following graphs types:\n\t{}".format(
             ',\n\t'.join(valid_types))
 
@@ -106,42 +101,43 @@ class NetworkEnvironment(Env):
         closeness centrality: the average cost to send funds to/from this node from/to other nodes in the network
         degree centrality: the fraction of edges incident to the node relative to the total number of edges
         load centrality: similar to betweenness centrality, except it only considers one cheapest path versus all
-        strengths: sum of out weights divided the max of the sum of these outweights
+        n_strengths: sum of out weights divided the max of the sum of these out weights
         :return:
         """
         # costs = self.ig_g.es["cost"]
         node_indices = self.ig_g.vs().indices
-        # norm = (self.graph_size * (self.graph_size - 1) / 2)
+        norm = (self.graph_size * (self.graph_size - 1) / 2)
         # w_norm = sum(costs)
-        # b_centralities = np.array(self.ig_g.betweenness(node_indices, weights=costs)) / norm
-        # b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)
+        b_centralities = np.array(self.ig_g.betweenness(node_indices, weights="cost")) / norm
+        b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)
 
         degrees = self.ig_g.degree(vertices=node_indices, mode="out", loops=False)
-        dc = np.zeros(shape=self.graph_size)
         total_degree = len(self.ig_g.es) // 2
-        for node in node_indices:
-            degree = degrees[node]
-            degree_centrality = degree / total_degree
-            dc[node] = degree_centrality
+        dc = np.divide(degrees, total_degree)
         d_centralities = torch.Tensor(dc).unsqueeze(-1)
 
-        ns = self.ig_g.strength(node_indices, mode="out", loops=False, weights="cost")
-        ns = ns / np.max(ns)
-        strengths = torch.Tensor(ns).unsqueeze(-1).nan_to_num(0)
+        ns = self.ig_g.strength(node_indices, mode="in", loops=False, weights="cost")
+        ns = np.divide(ns, degrees)
+        ns = np.divide(ns, max(ns))
+        n_strengths = torch.Tensor(ns).unsqueeze(-1).nan_to_num(0)
 
         cc = self.ig_g.closeness(vertices=node_indices, mode="all", weights="cost")
         c_centralities = torch.Tensor(cc).unsqueeze(-1).nan_to_num(0)
 
-        lc = nx.load_centrality(undirected(self.nx_graph))
-        l_centralities = torch.Tensor([lc[node["name"]] for node in self.ig_g.vs()]).unsqueeze(-1)
+        # ic = self.ig_g.eigenvector_centrality(weights="cost")
+        # i_centralities = torch.Tensor(ic).unsqueeze(-1).nan_to_num(0)
+
+        # lc = nx.load_centrality(undirected(self.nx_graph))
+        # l_centralities = torch.Tensor([lc[node["name"]] for node in self.ig_g.vs()]).unsqueeze(-1)
 
         'appending features in a tensor'
         self.features = torch.cat((
-            # b_centralities,
+            b_centralities,
             d_centralities,
             c_centralities,
-            l_centralities,
-            strengths,
+            # l_centralities,
+            # i_centralities,
+            n_strengths,
             self.node_vector.unsqueeze(-1)), dim=1)
         self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
 
@@ -149,15 +145,15 @@ class NetworkEnvironment(Env):
         illegal = ((self.node_vector + self.action_mask) > 0.).nonzero()  # if neighbor of node = illegal
         return illegal
 
-    def get_reward(self):  # if add node, what is the betweeness centrality?
-        new_btwn = self.ig_g.betweenness(self.node_id,  weights=self.ig_g.es["cost"]) / self.norm
+    def get_change_in_betweenness(self):  # if add node, what is the betweeness centrality?
+        new_btwn = self.ig_g.betweenness(self.node_id, weights=self.ig_g.es["cost"], cutoff=self.hop_limit) / self.norm
         # new_btwn = -self.ig_g.betweenness(self.node_id) / self.norm
         # new_btwn = self.get_triangles()
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
         return -reward
 
-    def get_triangles(self):
+    def get_change_in_triangles(self):
         triangles = 0
         incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_index])]
         if incident_edges:
@@ -204,6 +200,19 @@ class NetworkEnvironment(Env):
         # make sure we cannot select our own node
         self.action_mask[self.index_to_node.inverse[self.node_id]] = 1
 
+    def get_edge_vector_from_node(self):
+        # Create a vector of zeros to the length of the graph_size
+        self.node_vector = torch.zeros(self.graph_size)
+
+        if self.node_id not in self.default_node_ids:
+            incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
+            if incident_edges:
+                vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
+                vertices = vertices[vertices != self.node_index].type(torch.long)
+                self.node_vector = self.node_vector.put(vertices, torch.ones(len(vertices)))
+                self.budget_offset = len(vertices)
+        return self.node_vector
+
     def step(self, action: int):  # make action and give reward
         done = False
         if self.node_vector[action] == 1:  # if find neighbor = no reward (don't need node)
@@ -218,12 +227,12 @@ class NetworkEnvironment(Env):
         else:
             self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
-            # reward = 0
-            reward = self.get_reward()
+            reward = 0
+            # reward = self.get_change_in_btwnness()
 
         if self.num_actions == self.budget + self.budget_offset:  # check if exhausted budget
-            # self.get_reward()
-            # reward = self.btwn_cent
+            self.get_change_in_betweenness()
+            reward = self.btwn_cent
             done = True
             self.r_logger.add_log('tot_reward', self.btwn_cent)
         info = {}
@@ -235,52 +244,46 @@ class NetworkEnvironment(Env):
         neighbor_id = self.index_to_node[neighbor_index]
         if remove:
             self.ig_g.delete_edges((neighbor_id, self.node_id))
+            self.ig_g.delete_edges((self.node_id, neighbor_id))
             self.features[action, -1] = 0
             self.num_actions -= 1
         else:
             self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
+            self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)
+            # self.dgl_g.add_edge(neighbor_index, self.node_index)
+            # self.dgl_g.add_edge(self.node_index, neighbor_index)
             self.features[action, -1] = 1
             self.num_actions += 1
 
         self.dgl_g.ndata['features'] = self.features
 
     def reset(self):
-        if self.repeat and self.nx_graph is not None:
+        if self.repeat and self.ig_g is not None:
             # reload
-            self.nx_graph = deepcopy(self.base_graph)
+            self.ig_g = deepcopy(self.base_graph)
         else:
             if self.graph_type == 'snapshot':
                 if self.base_graph is not None:
-                    self.nx_graph = self.base_graph
+                    self.ig_g = self.base_graph
                 elif self.filename:
-                    self.nx_graph = get_snapshot(self.filename)
-
-                if self.node_id not in self.default_node_ids:
-                    self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
-                    self.node_index = self.index_to_node.inverse[self.node_id]
-                else:
-                    self.add_node("")
-            elif self.graph_type == 'sub_graph':
-                self.nx_graph = get_random_snapshot()
-                self.generate_subgraph()
-                self.add_node("")
+                    self.ig_g = nx_to_ig(get_snapshot(self.filename))
             elif self.graph_type == 'scale_free':
-                self.nx_graph = random_scale_free(self.k)
-                self.add_node(self.k)
-
-            self.graph_size = len(self.nx_graph.nodes())
+                self.ig_g = nx_to_ig(random_scale_free(self.k))
+            self.graph_size = len(self.ig_g.vs())
+            if self.node_id not in self.default_node_ids:
+                self.index_to_node = bidict(enumerate(self.ig_g.vs()))
+                self.node_index = self.index_to_node.inverse[self.node_id]
+            else:
+                self.add_node("")
 
             # Create bidictionary = tuple index: pubKey
-            self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
+            self.index_to_node = bidict(enumerate(self.ig_g.vs["name"]))
 
             if self.repeat:
-                self.base_graph = deepcopy(self.nx_graph)
+                self.base_graph = deepcopy(self.ig_g)
 
-        # convert nx_graph for gcn and metrics
-        self.ig_g = nx_to_ig(self.nx_graph)
-        self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
-        # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['cost','capacity']).add_self_loop()
-
+        self.dgl_g = dgl.graph([e.tuple for e in self.ig_g.es], num_nodes=self.graph_size)
+        self.dgl_g = dgl.add_self_loop(self.dgl_g)
         self.budget_offset = 0
         self.get_edge_vector_from_node()
         self.get_action_mask()
@@ -297,75 +300,8 @@ class NetworkEnvironment(Env):
         # self.btwn_cent = self.get_triangles()
         return self.dgl_g
 
-    def draw_graph(self):
-        if self.graph_type == 'snapshot':
-            nx.draw(self.nx_graph,
-                    node_color='blue',
-                    edge_color='yellow',
-                    node_size=150,
-                    node_shape='.'
-                    )
-            plt.show()
-
-        elif self.graph_type == 'sub_graph':
-            nx.draw(self.nx_graph,
-                    node_color='red',
-                    edge_color='green',
-                    node_size=150,
-                    node_shape='h'
-                    )
-            plt.show()
-
-        elif self.graph_type == 'scale_free':
-            nx.draw(self.nx_graph,
-                    node_color='purple',
-                    edge_color='pink',
-                    with_labels=True,
-                    node_size=150,
-                    node_shape='h'
-                    )
-            plt.show()
-
-    def get_edge_vector_from_node(self):
-        # Create a vector of zeros to the length of the graph_size
-        self.node_vector = torch.zeros(self.graph_size)
-
-        if self.node_id not in self.default_node_ids:
-            incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
-            if incident_edges:
-                vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
-                vertices = vertices[vertices != self.node_index].type(torch.long)
-                self.node_vector = self.node_vector.put(vertices, torch.ones(len(vertices)))
-                self.budget_offset = len(vertices)
-        return self.node_vector
-
-    def generate_subgraph(self):
-        if self.k >= len(self.nx_graph):
-            return self.nx_graph
-
-        included_nodes = set()
-        excluded_nodes = set(self.nx_graph.nodes())  # excluded= nodes already found
-        unexplored_neighbors = set()  # empty set of unexplored neighbors = k doesnt allow to explore neighbor
-
-        node = random.choice(list(excluded_nodes))  # Take a random node to start BFS=breadth first search
-        excluded_nodes.difference_update([node])  # Take node from non-explored
-        included_nodes.add(node)  # Add node in visited nodes
-        while len(included_nodes) < self.k:
-            neighbors = list(self.nx_graph.neighbors(node))  # Get all the neighbors from the node
-            shuffle(neighbors)  # Make the nodes random
-            # shorten neighbors so that subgraph stays below k
-            cutoff = min(self.k - len(included_nodes), len(neighbors))  # If enough space, add n if not until is filled
-            neighbors = set(neighbors[:cutoff])  # Get the nodes up to
-
-            unexplored_neighbors = unexplored_neighbors.union(
-                neighbors - included_nodes)  # Add cutoff = unexplored neighbors
-            included_nodes = included_nodes.union(neighbors)  # Add return n into included nodes
-            excluded_nodes.difference_update(neighbors)  # Take out the neighbors
-            node = random.choice(list(unexplored_neighbors))  # Choose a random node from unexplored neighbors
-            unexplored_neighbors.difference_update([node])  # Remove that node from unexplored
-        self.nx_graph = nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))  # return networkx graph
-
     def add_node(self, node_id):
         self.node_id = node_id
-        self.node_index = len(self.nx_graph)
-        self.nx_graph.add_node(self.node_id)
+        self.node_index = self.graph_size
+        self.ig_g.add_vertex(self.node_id)
+        self.graph_size = len(self.ig_g.vs())
