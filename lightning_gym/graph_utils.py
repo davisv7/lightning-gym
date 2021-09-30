@@ -50,18 +50,25 @@ def random_scale_free(k):
 def nx_to_ig(nx_graph):
     """
     Given an nx_graph, convert it to an igraph.
+    Directed, new cost is the max between
     :param nx_graph:
     :return:
     """
     ig_g = ig.Graph()
     for node in nx_graph.nodes():  # n nodes into the nk_graph
         ig_g.add_vertex(name=node)
+    seen = set()
     for u, v in nx_graph.edges():
+        if (v, u) in seen:
+            continue
+        else:
+            seen.add((u, v))
         c1 = nx_graph[u][v].get('cost', 0.1)
         c2 = nx_graph[v][u].get('cost', 0.1)
         capacity = nx_graph[u][v].get('capacity')
-        ig_g.add_edges([(u, v)], {'cost': [c1], 'capacity': [capacity]})  # slightly less overhead than add_edge
-        # ig_g.add_edges([(v, u)], {'cost': [c2], 'capacity': [capacity]})
+        cost = max(c1, c2, 1)
+        ig_g.add_edges([(u, v)], {'cost': [cost], 'capacity': [capacity]})  # slightly less overhead than add_edge
+        ig_g.add_edges([(v, u)], {'cost': [cost], 'capacity': [capacity]})
     return ig_g
 
 

@@ -5,7 +5,7 @@ from lightning_gym.utils import print_config
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 from ActorCritic import DiscreteActorCritic
 import configparser
-from lightning_gym.graph_utils import nx_to_ig
+
 
 def main():
     """
@@ -39,7 +39,7 @@ def main():
     if graph_filters.getboolean("combine_multiedges"):
         g = simplify_graph(g)
     if graph_filters.getboolean("remove_bridges"):
-        g = nx_to_ig(reduce_to_mainnet(g))
+        g = nx.DiGraph(reduce_to_mainnet(g))
 
     """
     at this point, we should have a graph with the following properties:
