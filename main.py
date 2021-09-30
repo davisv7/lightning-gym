@@ -5,6 +5,9 @@ from lightning_gym.utils import print_config
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 from ActorCritic import DiscreteActorCritic
 import configparser
+import random
+import numpy as np
+import torch
 
 
 def main():
@@ -19,6 +22,11 @@ def main():
     config.read("config.conf")
     print_config(config)
     json_filename = config["env"]["filename"]
+    seed = config["env"].getint("seed", fallback=None)
+    if seed:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
     nodes, edges = load_json(path.join(getcwd(), json_filename))
 
     # clean nodes

@@ -125,8 +125,9 @@ class NetworkEnvironment(Env):
             dc[node] = degree_centrality
         d_centralities = torch.Tensor(dc).unsqueeze(-1)
 
-        ns = self.ig_g.strength(node_indices, mode="out", loops=False, weights="cost")
-        ns = ns / np.max(ns)
+        ns = self.ig_g.strength(node_indices, mode="all", loops=False, weights="cost")
+        ns = np.divide(ns, degrees)
+        ns = np.divide(ns, np.max(ns))
         strengths = torch.Tensor(ns).unsqueeze(-1).nan_to_num(0)
 
         cc = self.ig_g.closeness(vertices=node_indices, mode="all", weights="cost")
