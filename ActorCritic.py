@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
 from lightning_gym.GCN import GCN
+from collections import deque
+from random import sample
+import numpy as np
 
 
 class DiscreteActorCritic:
@@ -10,6 +13,7 @@ class DiscreteActorCritic:
         self.path = config.get("agent", "model_file")
         self.cuda = config.getboolean("agent", "cuda")
         self._load_model = config.getboolean("agent", "load_model")  # if have previous model to pass down
+        # self.memory_replay_buffer = deque(maxlen=5000)
 
         # hyperparameters
         self.in_feats = config.getint("agent", "in_features")  # of node features - equal to length of x in BTWN.py
@@ -54,10 +58,7 @@ class DiscreteActorCritic:
             if self.cuda:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
-            # convolve our model
-            # G = self.model(G)
-
-            # We put it into our model
+            # convolve our graph
             [pi, val] = self.model(G)
 
             # Get action from policy network
@@ -74,6 +75,9 @@ class DiscreteActorCritic:
             R = torch.cat([R, reward.unsqueeze(0)], dim=0)
             # The Value we thought it would be ???????????
             V = torch.cat([V, val.unsqueeze(0)], dim=0)
+
+            # pirv = [pi[action], reward, val]  # pi,r,v
+            # self.memory_replay_buffer.append(pirv)
 
         tot_return = R.sum().item()
         # self.log.add_item('gains',np.flip(R.numpy()))
@@ -108,7 +112,8 @@ class DiscreteActorCritic:
         self.optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:
             R = R.cuda()
-        A = R.squeeze() - V.squeeze().detach()
+        A = (R.squeeze() - V.squeeze()).detach()
+        # A = R.squeeze() - V.squeeze().detach()
         L_policy = -(torch.log(PI) * A).mean()
         L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
         L_entropy = -(PI * PI.log()).mean()
@@ -117,6 +122,24 @@ class DiscreteActorCritic:
         self.optimizer.step()
         self.problem.r_logger.add_log('td_error', L_value.detach().item())
         self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
+
+    # def memory_replay(self):
+    #     self.optimizer.zero_grad()  # needed to update parameter correctly
+    #     num_exp = 500
+    #     if len(self.memory_replay_buffer) >= num_exp:
+    #         experiences = sample(self.memory_replay_buffer, num_exp)
+    #     else:
+    #         experiences = self.memory_replay_buffer
+    #     PI, R, V = list(map(lambda x: torch.cat(x), zip(*experiences)))
+    #     PI, R, V = list(map(lambda x: x.unsqueeze(-1), [PI, R, V]))
+    #     V = V.unsqueeze(-1)
+    #
+    #     A = (R.squeeze() - V.squeeze()).detach()
+    #     L_policy = -(torch.log(PI) * A).mean()
+    #     L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
+    #     L = L_policy + L_value  # - 0.1 * L_entropy
+    #     L.backward()
+    #     self.optimizer.step()
 
     # Run so many numbers of episode then run the model
     def train(self):
@@ -127,7 +150,7 @@ class DiscreteActorCritic:
             PI = torch.cat([PI, pi], dim=0)  # Appending what learned to previous pi
             R = torch.cat([R, r], dim=0)
             V = torch.cat([V, v], dim=0)
-
+        # self.memory_replay()
         self.update_model(PI, R, V)
         return self.problem.r_logger
 
