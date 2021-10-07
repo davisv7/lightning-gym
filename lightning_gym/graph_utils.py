@@ -57,7 +57,7 @@ def nx_to_ig(nx_graph):
     for node in nx_graph.nodes():  # n nodes into the nk_graph
         ig_g.add_vertex(name=node)
     for u, v in nx_graph.edges():
-        c1 = nx_graph[u][v].get('cost', 0.1)
+        c1 = nx_graph[u][v].get('cost')
         capacity = nx_graph[u][v].get('capacity')
         ig_g.add_edges([(u, v)], {'cost': [c1], 'capacity': [capacity]})  # slightly less overhead than add_edge
     return ig_g
@@ -67,8 +67,8 @@ def undirected(nx_graph):
     undirected_graph = nx.Graph()
     undirected_graph.add_nodes_from(nx_graph.nodes())
     for u, v in nx_graph.edges():
-        c1 = nx_graph[u][v].get('cost', 0.1)
-        c2 = nx_graph[v][u].get('cost', 0.1)
+        c1 = nx_graph[u][v].get('cost')
+        c2 = nx_graph[v][u].get('cost')
         capacity = nx_graph[u][v].get('capacity')
         cost = max(c1, c2, 1)
         undirected_graph.add_edge(u, v, cost=cost, capacity=capacity)
