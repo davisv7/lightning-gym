@@ -40,7 +40,7 @@ def main():
     # Create graph
     g = nx.MultiDiGraph()
     g.add_edges_from(active_edges)
-    g = g.subgraph(active_nodes)
+    g = nx.MultiDiGraph(g.subgraph(active_nodes))
 
     # clean graph
     graph_filters = config["graph_filters"]
