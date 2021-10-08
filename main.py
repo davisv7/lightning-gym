@@ -8,7 +8,7 @@ import configparser
 import random
 import numpy as np
 import torch
-
+from lightning_gym.graph_utils import undirected
 
 def main():
     """
@@ -48,7 +48,8 @@ def main():
         g = simplify_graph(g)
     if graph_filters.getboolean("remove_bridges"):
         g = nx.DiGraph(reduce_to_mainnet(g))
-
+    if graph_filters.getboolean("undirected"):
+        g = undirected(g)
     """
     at this point, we should have a graph with the following properties:
     - no multi-edges, in favor of whichever edge has the highest cost, capacities are combined
@@ -58,6 +59,8 @@ def main():
     - non-disabled edges with some minimum capacity
     - edges that have defined policies
     """
+
+    print(len(g.nodes()), len(g.edges()))
 
     # create an environment, an agent, and then train for some number of episodes
     env = NetworkEnvironment(config, g=g)
