@@ -60,7 +60,7 @@ def nx_to_ig(nx_graph, add_self_loop=True):
     for node in nx_graph.nodes():  # n nodes into the nk_graph
         ig_g.add_vertex(name=node)
         if add_self_loop:
-            ig_g.add_edges([(node, node)], {'cost': [1e6], 'capacity': [0]})
+            ig_g.add_edges([(node, node)], {'cost': [1e3], 'capacity': [0]})
 
     for u, v in nx_graph.edges():
         c1 = nx_graph[u][v].get('cost', 0.1)
@@ -76,12 +76,16 @@ def down_sample(nx_graph, config):
     """
     n = config.getint("env", "n", fallback=None)
     node_id = config.get("env", "node_id")
+
+    if len(nx_graph) <= n:
+        return nx_graph
+
     new_nx_graph = deepcopy(nx_graph)
     degrees = np.array([y for x, y in nx_graph.degree()])
-    probs = 1-np.divide(degrees, sum(degrees))
+    probs = 1 - np.divide(degrees, sum(degrees))
     probs = np.divide(probs, sum(probs))
     nodes = nx_graph.nodes()
-    un_chosen_ones = np.random.choice(nodes, len(nx_graph)-n, p=probs,replace=False)
+    un_chosen_ones = np.random.choice(nodes, len(nx_graph) - n, p=probs, replace=False)
     new_nx_graph.remove_nodes_from(un_chosen_ones)
     if node_id is not None:
         if node_id not in new_nx_graph.nodes():
