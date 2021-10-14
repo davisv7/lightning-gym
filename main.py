@@ -8,7 +8,8 @@ import configparser
 import random
 import numpy as np
 import torch
-from lightning_gym.graph_utils import undirected
+from lightning_gym.graph_utils import undirected, down_sample
+
 
 def main():
     """
@@ -23,6 +24,8 @@ def main():
     print_config(config)
     json_filename = config["env"]["filename"]
     seed = config["env"].getint("seed", fallback=None)
+    ds = config.getboolean("env", "down_sample")
+
     if seed:
         random.seed(seed)
         np.random.seed(seed)
@@ -41,7 +44,8 @@ def main():
     g = nx.MultiDiGraph()
     g.add_edges_from(active_edges)
     g = nx.MultiDiGraph(g.subgraph(active_nodes))
-
+    if ds:
+        g = down_sample(g, config)
     # clean graph
     graph_filters = config["graph_filters"]
     if graph_filters.getboolean("combine_multiedges"):
