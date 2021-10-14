@@ -92,7 +92,7 @@ class NetworkEnvironment(Env):
         self.neighbors = None
         self.default_node_ids = ["", None, self.n]
         self.hop_limit = 20  # the lnd protocol does not allow payments with more than 20 intermediaries
-        valid_types = ['sub_graph', 'snapshot', 'random_snapshot', 'scale_free']
+        valid_types = ['snapshot', 'random_snapshot', 'scale_free']
         assert self.graph_type in valid_types, "\nYou must use one of the following graphs types:\n\t{}".format(
             ',\n\t'.join(valid_types))
 
