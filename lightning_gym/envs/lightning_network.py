@@ -116,7 +116,7 @@ class NetworkEnvironment(Env):
 
         if self.features is None or not self.repeat:
             # costs = self.ig_g.es["cost"]
-            node_indices = self.ig_g.vs().indices
+            # node_indices = self.ig_g.vs().indices
             # norm = (self.graph_size * (self.graph_size - 1))
             # w_norm = sum(costs)
             # b_centralities = np.array(self.ig_g.betweenness(node_indices, weights="cost")) / self.norm
@@ -155,11 +155,20 @@ class NetworkEnvironment(Env):
             self.features[:, -1] = self.node_vector
         self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
 
-    def get_illegal_actions(self):  # tells Ajay to not look at neighbors as an action
+    def get_illegal_actions(self):
+        """
+        A node is illegal if the agent is already connected to that node, or if it is masked by the action mask
+        :return:
+        """
         illegal = ((self.node_vector + self.action_mask + self.neighbors) > 0.).nonzero()
         return illegal
 
-    def get_reward(self):  # if add node, what is the betweeness centrality?
+    def get_reward(self):
+        """
+        Reward here is defined as the change in betweenness centrality of node_id.
+        Could also be represented by the betweenness of the most recently added edge.
+        :return:
+        """
 
         new_btwn = self.ig_g.betweenness(self.node_id, weights="cost", cutoff=self.cutoff) / self.norm
         # new_btwn = -self.ig_g.betweenness(self.node_id) / self.norm
@@ -170,6 +179,11 @@ class NetworkEnvironment(Env):
         # return self.btwn_cent / self.num_actions
 
     def get_triangles(self):
+        """
+        A triangle is a cycle of three nodes where one of the nodes is node_id and the other two are nodes that
+        node_id is connected to. These cycles represent potentially cheap rebalance routes.
+        :return:
+        """
         triangles = 0
         incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_index])]
         if incident_edges:
@@ -180,10 +194,23 @@ class NetworkEnvironment(Env):
         return triangles
 
     def get_recommendations(self):
+        """
+        Returns a sorted list of recommendations as indicated by actions_taken.
+        :return:
+        """
         actions_taken = (self.node_vector == 1).nonzero()
         return sorted([self.index_to_node[index.item()] for index in actions_taken])
 
     def update_action_mask(self):
+        """
+        Creates an action mask according to some constraints. Such constraints can include but are not limited to:
+            minimum degree
+            minimum average capacity per channel
+            minimum reliability
+            minimum edge betweenness
+        If a node is in the action mask, it is deemed an illegal move and will not be taken by the agent.
+        :return:
+        """
         if self.action_mask is None or not self.repeat:
             if self.graph_type == "scale_free":
                 self.action_mask = np.zeros(self.graph_size)
