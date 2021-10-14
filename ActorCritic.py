@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from lightning_gym.GCN import GCN
+from lightning_gym.EGNNC import EGNNC
 from collections import deque
 from random import sample
 import numpy as np
@@ -25,7 +26,7 @@ class DiscreteActorCritic:
         self._test = kwargs.get("test", False)
 
         # create the model for the ajay
-        self.model = GCN(self.in_feats, self.n_hidden, self.n_hidden, n_layers=self.layers, activation=F.rrelu)
+        self.model = EGNNC(self.in_feats, self.n_hidden, self.n_hidden, n_layers=self.layers, activation=F.rrelu)
         if self._load_model:  # making model
             self.load_model()
         if self.cuda:
@@ -59,7 +60,10 @@ class DiscreteActorCritic:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
             # convolve our graph
-            [pi, val] = self.model(G)
+            costs = self.problem.costs
+            # betweennesses = self.problem.edge_betweennesses
+            # weights = torch.cat((betweennesses, costs),dim=-1)
+            [pi, val] = self.model(G, w=costs)
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
@@ -81,7 +85,7 @@ class DiscreteActorCritic:
 
         tot_return = R.sum().item()
         # self.log.add_item('gains',np.flip(R.numpy()))
-
+        R[0], R[1] = R[1] / 2, R[1] / 2
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
@@ -113,6 +117,7 @@ class DiscreteActorCritic:
         if self.cuda:
             R = R.cuda()
         A = (R.squeeze() - V.squeeze()).detach()
+        # A = (A - A.mean()) / (A.std() + 1e-10)
         # A = R.squeeze() - V.squeeze().detach()
         L_policy = -(torch.log(PI) * A).mean()
         L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
