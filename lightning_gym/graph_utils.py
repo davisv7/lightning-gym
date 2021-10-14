@@ -3,6 +3,8 @@ from os import path, getcwd
 import igraph as ig
 from .utils import get_random_filename
 from ln_graph_utils.ln_graph_utils import load_json
+import numpy as np
+from copy import deepcopy
 
 
 def make_nx_graph(nodes, edges):
@@ -44,23 +46,48 @@ def get_snapshot(filename):
 
 
 def random_scale_free(k):
-    return nx.scale_free_graph(k, 0.8, 0.1, 0.1).to_undirected()
+    return nx.scale_free_graph(k, 0.8, 0.1, 0.1)
 
 
-def nx_to_ig(nx_graph):
+def nx_to_ig(nx_graph, add_self_loop=True):
     """
     Given an nx_digraph, convert it to an igraph.
+    :param add_self_loop:
     :param nx_graph:
     :return:
     """
     ig_g = ig.Graph()
     for node in nx_graph.nodes():  # n nodes into the nk_graph
         ig_g.add_vertex(name=node)
+        if add_self_loop:
+            ig_g.add_edges([(node, node)], {'cost': [1e6], 'capacity': [0]})
+
     for u, v in nx_graph.edges():
         c1 = nx_graph[u][v].get('cost', 0.1)
         capacity = nx_graph[u][v].get('capacity')
         ig_g.add_edges([(u, v)], {'cost': [c1], 'capacity': [capacity]})  # slightly less overhead than add_edge
     return ig_g
+
+
+def down_sample(nx_graph, config):
+    """
+    Remove nodes randomly with respect to degree centrality until under n.
+    :return:
+    """
+    n = config.getint("env", "n", fallback=None)
+    node_id = config.get("env", "node_id")
+    new_nx_graph = deepcopy(nx_graph)
+    degrees = np.array([y for x, y in nx_graph.degree()])
+    probs = 1-np.divide(degrees, sum(degrees))
+    probs = np.divide(probs, sum(probs))
+    nodes = nx_graph.nodes()
+    un_chosen_ones = np.random.choice(nodes, len(nx_graph)-n, p=probs,replace=False)
+    new_nx_graph.remove_nodes_from(un_chosen_ones)
+    if node_id is not None:
+        if node_id not in new_nx_graph.nodes():
+            new_nx_graph.add_node(node_id)
+            new_nx_graph = nx.subgraph(nx_graph, new_nx_graph.nodes())
+    return new_nx_graph
 
 
 def undirected(nx_graph):
