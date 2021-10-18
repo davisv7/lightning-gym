@@ -76,7 +76,7 @@ def main():
         log = ajay.train()
         recommendations = env.get_recommendations()
         print("E: {}, R: {:.4f}, N:{}".format(episode, log.log['tot_reward'][-1], recommendations))
-        ajay.save_model()
+        # ajay.save_model()
 
     print('total reward: ', env.r_logger.log['tot_reward'])
     print("td error: ", env.r_logger.log['td_error'])
