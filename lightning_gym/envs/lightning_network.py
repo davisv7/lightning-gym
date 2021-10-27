@@ -1,12 +1,8 @@
 from gym import Env
-import numpy as np
 from bidict import bidict
 import dgl
 import torch
-import random
 from ..Logger import Logger
-from random import shuffle
-from copy import deepcopy
 import matplotlib.pyplot as plt
 from ..graph_utils import *
 from functools import reduce
@@ -77,7 +73,7 @@ class NetworkEnvironment(Env):
         self.ig_g = None
         self.dgl_g = None
         self.costs = None
-        self.edge_betweennesses = None
+        self.e_btwns = None
         self.graph_size = None
         self.btwn_cent = 0
         self.node_vector = None
@@ -162,6 +158,14 @@ class NetworkEnvironment(Env):
         """
         illegal = ((self.node_vector + self.action_mask + self.neighbors) > 0.).nonzero()
         return illegal
+
+    def get_legal_actions(self):
+        """
+        A node is legal if the agent is not already connected to that node, and if it is not masked by the action mask
+        :return:
+        """
+        legal = ((self.node_vector + self.action_mask + self.neighbors) == 0.).nonzero()
+        return legal
 
     def get_reward(self):
         """
@@ -250,6 +254,7 @@ class NetworkEnvironment(Env):
 
     def step(self, action: int):  # make action and give reward
         done = False
+        reward = 0
         if self.node_vector[action] == 1:  # if find neighbor = no reward (don't need node)
             '''
             right now, selecting na index twice doesnt do anything
@@ -283,6 +288,10 @@ class NetworkEnvironment(Env):
             self.num_actions -= 1
         else:
             self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
+            self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)  # TODO: what if the graph is undirected
+            self.dgl_g.add_edges([neighbor_index, self.node_index],
+                                 [self.node_index, neighbor_index])
+            self.costs = torch.cat([self.costs, torch.Tensor([[0.1], [0.1]])])
             self.features[action, -1] = 1
             self.num_actions += 1
 
@@ -320,12 +329,15 @@ class NetworkEnvironment(Env):
         self.ig_g = nx_to_ig(self.nx_graph)
         self.dgl_g = dgl.from_networkx(self.nx_graph).add_self_loop()
         # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['cost','capacity']).add_self_loop()
-        if not self.repeat or self.costs is None or self.edge_betweennesses is None:
-            self.norm = (self.graph_size * (self.graph_size - 1))
-            self.costs = self.ig_g.es["cost"]
-            self.costs = torch.Tensor(-np.array(self.costs) / max(self.costs)).unsqueeze(-1)
-            # self.edge_betweennesses = self.ig_g.edge_betweenness(weights="cost", cutoff=self.cutoff)
-            # self.edge_betweennesses = torch.Tensor(np.array(self.edge_betweennesses) / self.norm).unsqueeze(-1)
+        self.norm = (self.graph_size * (self.graph_size - 1))
+        self.costs = self.ig_g.es["cost"]
+        cost_norm = np.linalg.norm(self.costs)
+        # self.costs = torch.Tensor(-np.array(self.costs) / max(self.costs)).unsqueeze(-1)
+        self.costs = self.costs / cost_norm
+        self.costs = torch.Tensor(self.costs).unsqueeze(-1)
+
+        # self.e_btwns = np.array(self.ig_g.edge_betweenness(weights="cost", cutoff=self.cutoff))
+        # self.e_btwns = torch.Tensor(self.e_btwns - np.mean(self.e_btwns) / np.std(self.e_btwns)).unsqueeze(-1)
 
         self.budget_offset = 0
         self.update_neighbor_vector()
