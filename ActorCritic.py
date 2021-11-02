@@ -2,9 +2,84 @@ import torch
 import torch.nn.functional as F
 from lightning_gym.GCN import GCN
 from lightning_gym.EGNNC import EGNNC
+from lightning_gym.SAGE import SAGE
 from collections import deque
 from random import sample
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class Actor(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 n_hidden,
+                 n_classes=1,
+                 n_layers=1,
+                 is_recurrent=True
+                 ):
+        super(Actor, self).__init__()
+        self.recurrent = is_recurrent
+        self.layers = nn.ModuleList()
+        if n_layers == 1:
+            n_hidden = n_classes
+
+        for i in range(n_layers):
+            if i == 0 and self.recurrent:  # first layer, recurrent
+                self.layers.append(nn.LSTM(in_feats, n_hidden, batch_first=True))
+            elif i == 0:  # first layer, not recurrent
+                self.layers.append(nn.Linear(in_feats, n_hidden))
+            elif i != n_layers - 1:  # hidden layer
+                self.layers.append(nn.Linear(n_hidden, n_hidden))
+            else:  # last layer
+                self.layers.append(nn.Linear(n_hidden, n_classes))
+
+    def forward(self, state, hidden=None):
+        a, h = state, None
+        for i, layer in enumerate(self.layers):
+            if i == 0 and self.recurrent:
+                layer.flatten_parameters()
+                a, h = layer(a, hidden)
+            else:
+                a = F.relu(layer(a))
+        return a
+
+
+class Critic(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 n_hidden,
+                 n_classes=1,
+                 n_layers=1,
+                 is_recurrent=True
+                 ):
+        super(Critic, self).__init__()
+        self.recurrent = is_recurrent
+        self.layers = nn.ModuleList()
+        if n_layers == 1:
+            n_hidden = n_classes
+
+        for i in range(n_layers):
+            if i == 0 and self.recurrent:  # first layer, recurrent
+                self.layers.append(nn.LSTM(in_feats, n_hidden, batch_first=True))
+            elif i == 0:  # first layer, not recurrent
+                self.layers.append(nn.Linear(in_feats, n_hidden))
+            elif i != n_layers - 1:  # hidden layer
+                self.layers.append(nn.Linear(n_hidden, n_hidden))
+            else:  # last layer
+                self.layers.append(nn.Linear(n_hidden, n_classes))
+
+    def forward(self, state, hidden=None):
+        for i, layer in enumerate(self.layers):
+            if i == 0 and self.recurrent:
+                layer.flatten_parameters()
+                state, hidden = layer(state, hidden)
+            if i == len(self.layers) - 1:
+                state = F.relu(layer(state))
+            else:
+                state = F.relu(layer(state))
+        return state
 
 
 class DiscreteActorCritic:
@@ -13,31 +88,33 @@ class DiscreteActorCritic:
         self.problem = problem  # environment
         self.path = config.get("agent", "model_file")
         self.cuda = config.getboolean("agent", "cuda")
-        self._load_model = config.getboolean("agent", "load_model")  # if have previous model to pass down
-        # self.memory_replay_buffer = deque(maxlen=5000)
+        self._load_model = config.getboolean("agent", "load_model")
 
         # hyperparameters
-        self.in_feats = config.getint("agent", "in_features")  # of node features - equal to length of x in BTWN.py
-        self.n_hidden = config.getint("agent", "hidden_dimension")
+        self.in_feats = config.getint("agent", "in_features")
+        self.hid_feats = config.getint("agent", "hid_features")
+        self.out_feats = config.getint("agent", "out_features")
         self.gamma = config.getfloat("agent", "gamma")
         self.layers = config.getint("agent", "layers")
-        self.learning_rate = config.getfloat("agent", "learning_rate")  # this changes the learning rate
-        self.num_episodes = 1  # is it redundant to have # of episodes, in main running episodes?
+        self.learning_rate = config.getfloat("agent", "learning_rate")
+        self.num_episodes = 1
         self._test = kwargs.get("test", False)
 
         # create the model for the ajay
-        self.model = EGNNC(self.in_feats, self.n_hidden, self.n_hidden, n_layers=self.layers, activation=F.rrelu)
+        self.model = EGNNC(self.in_feats, self.hid_feats, self.out_feats, n_layers=self.layers, activation=F.rrelu)
+        self.actor = Actor(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
+        self.critic = Critic(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
+
         if self._load_model:  # making model
             self.load_model()
         if self.cuda:
             self.model = self.model.cuda()
 
-        # Does optimizer make it work better?
-        # self.optimizer = torch.optim.Adam([
-        #     {'params': self.model.policy.parameters()},
-        #     {'params': self.model.value.parameters()}
-        # ], lr=self.learning_rate)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam([
+            # {'params': self.actor.parameters(), "lr": 1e-4},
+            # {'params': self.critic.parameters(), "lr": 1e-4},
+            {'params': self.model.parameters(), "lr": self.learning_rate}
+        ])
 
     def print_actor_configuration(self):
         print("\tLoad model: {}".format(self._load_model),
@@ -61,9 +138,12 @@ class DiscreteActorCritic:
 
             # convolve our graph
             costs = self.problem.costs
-            # betweennesses = self.problem.edge_betweennesses
-            # weights = torch.cat((betweennesses, costs),dim=-1)
-            [pi, val] = self.model(G, w=costs)
+            # betweennesses = self.problem.e_btwns
+            # weights = torch.cat((betweennesses, costs), dim=-1)
+            [h, mN] = self.model(G, w=costs)
+            # [h, mN] = self.model(G)
+            pi = self.actor(h)
+            val = self.critic(mN)
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
@@ -85,7 +165,9 @@ class DiscreteActorCritic:
 
         tot_return = R.sum().item()
         # self.log.add_item('gains',np.flip(R.numpy()))
-        R[0], R[1] = R[1] / 2, R[1] / 2
+
+        # R = torch.Tensor(np.zeros_like(np.mean(R.numpy()), shape=self.problem.budget))
+        # R[0] = R[1] + 0
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
@@ -101,18 +183,23 @@ class DiscreteActorCritic:
         # Given this state, what action should i take-
         # if have illegal action(neighbor) don't want to take that action into account
         pi = F.softmax(pi, dim=0)  # Calculate distribution
+        # pi[illegal_actions] = 0  # Whenever actor is trying to find policy distribution
         # Get the probability of action we can take
         dist = torch.distributions.categorical.Categorical(pi)
         # Take the higher probability
+        probs = dist.probs.detach().numpy()
+        # probs = probs / sum(probs)
         if self._test:
-            action = dist.probs.argmax()
+            action = probs.argmax()
         else:
             action = dist.sample()
+            # action = np.random.choice(list(range(len(probs))), replace=False, p=probs)
             # action = choice([dist.probs.argmax, dist.sample])()
         return action
 
     def update_model(self, PI, R, V):
-        # R = (R - R.mean()) / (R.std() + 0.00001)
+        # R = (R - R.mean()) / (R.std() + 1e-10)
+        # V = (V - V.mean()) / (V.std() + 1e-10)
         self.optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:
             R = R.cuda()

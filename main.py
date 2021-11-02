@@ -9,6 +9,7 @@ import random
 import numpy as np
 import torch
 from lightning_gym.graph_utils import undirected, down_sample
+from DQN import DQNAgent
 
 
 def main():
@@ -54,6 +55,8 @@ def main():
         g = nx.DiGraph(reduce_to_mainnet(g))
     if graph_filters.getboolean("undirected"):
         g = undirected(g)
+    if graph_filters.getboolean("unweighted"):
+        nx.set_edge_attributes(g, values=0.1, name='cost')
     """
     at this point, we should have a graph with the following properties:
     - no multi-edges, in favor of whichever edge has the highest cost, capacities are combined

@@ -86,6 +86,8 @@ def down_sample(nx_graph, config):
     probs = np.divide(probs, sum(probs))
     nodes = nx_graph.nodes()
     un_chosen_ones = np.random.choice(nodes, len(nx_graph) - n, p=probs, replace=False)
+    # un_chosen_ones = np.random.choice(nodes, len(nx_graph) - n,  replace=False)
+
     new_nx_graph.remove_nodes_from(un_chosen_ones)
     if node_id is not None:
         if node_id not in new_nx_graph.nodes():
@@ -109,15 +111,3 @@ def undirected(nx_graph):
         cost = max(c1, c2, 1)
         undirected_graph.add_edge(u, v, cost=cost, capacity=capacity)
     return undirected_graph
-
-
-def unweighted(nx_graph):
-    seen = []
-    unweighted_graph = nx.Graph()
-    unweighted_graph.add_nodes_from(nx_graph.nodes())
-    for u, v in nx_graph.edges():
-        if (v, u) in seen:
-            continue
-        else:
-            unweighted_graph.add_edge(u, v)
-    return unweighted_graph

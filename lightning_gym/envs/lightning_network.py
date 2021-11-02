@@ -331,9 +331,8 @@ class NetworkEnvironment(Env):
         # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['cost','capacity']).add_self_loop()
         self.norm = (self.graph_size * (self.graph_size - 1))
         self.costs = self.ig_g.es["cost"]
-        cost_norm = np.linalg.norm(self.costs)
-        # self.costs = torch.Tensor(-np.array(self.costs) / max(self.costs)).unsqueeze(-1)
-        self.costs = self.costs / cost_norm
+        cost_mean = np.mean(self.costs)
+        self.costs = self.costs / cost_mean
         self.costs = torch.Tensor(self.costs).unsqueeze(-1)
 
         # self.e_btwns = np.array(self.ig_g.edge_betweenness(weights="cost", cutoff=self.cutoff))
