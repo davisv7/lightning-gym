@@ -9,38 +9,47 @@ from dgl.nn.pytorch import GraphConv
 from dgl import readout_nodes
 
 
-class GCN(nn.Module):  # Create GCN class
+class GCN(nn.Module):
     def __init__(self,
-                 in_feats,  # Number of features each node has
-                 hid_feats,  # Size of Hidden Features (Neighbors features)
-                 out_feats,  # Size of final features vector
-                 n_layers,  # Number of layers
-                 activation,  # Activation layer Relu in our case
-                 dropout=0.05
+                 in_feats,
+                 hid_feats,
+                 out_feats,
+                 n_layers,
+                 activation,
+                 dropout=0.10
                  ):
+        """
+        Graph Convolutional Network Class
+        :param in_feats: number of input features
+        :param n_hidden: number of features in the hidden layers
+        :param n_classes: number of features in the output layer
+        :param n_layers: TOTAL number of layers in the network
+        :param activation: activation function to be used
+        :param dropout:
+        """
         super(GCN, self).__init__()
 
-        # Why Policy and value
-        self.layers = nn.ModuleList()  # Create empty list of layers
+        self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(GraphConv(in_feats, hid_feats, activation=activation))
+        self.layers.append(GraphConv(in_feats, hid_feats, norm="left", activation=activation))
         # hidden layers
-        for i in range(n_layers - 2):  # Representation of neighbors
-            self.layers.append(GraphConv(hid_feats, hid_feats, activation=activation))
+        for i in range(n_layers - 2):
+            self.layers.append(GraphConv(hid_feats, hid_feats, norm="left", activation=activation))
         # output layer
-        self.layers.append(GraphConv(hid_feats, out_feats))  # Making x by x hidden layer
+        self.layers.append(GraphConv(hid_feats, out_feats, norm="left"))
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, g):
-        '''
-        features pass to j
-        b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1
-        '''
+        """
+        Forward function defines how data is passed through the neural network.
+        :param g: graph itself (dgl graph)
+        :return: h tensor of node out-features, mN the column-wise mean of these features
+        """
         h = g.ndata['features']  # Get features from graph
         for i, layer in enumerate(self.layers):
-            # if i != 0:
+            # if i != len(self.layers) - 1:
             #     h = self.dropout(h)
-            h = layer(g, h)  # Features after they been convoluted
+            h = layer(g, h)  # Features after they been convoluted, these represent the nodes
         g.ndata['h'] = h
-        mN = readout_nodes(g, 'h', op="mean")  # mean of those features
+        mN = readout_nodes(g, 'h', op="mean")  # column-wise average of those node features, this represents the graph
         return h, mN
