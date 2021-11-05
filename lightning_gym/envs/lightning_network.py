@@ -172,10 +172,7 @@ class NetworkEnvironment(Env):
         Could also be represented by the betweenness of the most recently added edge.
         :return:
         """
-
         new_btwn = self.ig_g.betweenness(self.node_id, weights="cost", cutoff=self.cutoff) / self.norm
-        # new_btwn = -self.ig_g.betweenness(self.node_id) / self.norm
-        # new_btwn = self.get_triangles()
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
         return reward
@@ -251,7 +248,12 @@ class NetworkEnvironment(Env):
             # make sure we cannot select our own node
             self.action_mask[self.index_to_node.inverse[self.node_id]] = 1
 
-    def step(self, action: int):  # make action and give reward
+    def step(self, action: int):
+        """
+        Update graph, node_vector, reward, and done using action
+        :param action: index representing node being connected to
+        :return:
+        """
         done = False
         reward = 0
         if self.node_vector[action] == 1:  # if find neighbor = no reward (don't need node)
@@ -259,26 +261,30 @@ class NetworkEnvironment(Env):
             right now, selecting na index twice doesnt do anything
             what if selecting an index twice removed the channel? increment budget, reward is negative change
             '''
-            # reward = 0
             self.node_vector[action] = 0  # mark channel for deletion
             self.take_action(action, remove=True)
             # reward = 1.01 * self.get_reward()
         else:
             self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
-            # reward = 0
             reward = self.get_reward()
 
-        if self.num_actions == self.budget + self.budget_offset:  # check if exhausted budget
+        if self.num_actions == self.budget + self.budget_offset:  # check if budget has been exhausted
             # self.get_reward()
             # reward = self.btwn_cent
             done = True
             self.r_logger.add_log('tot_reward', self.btwn_cent)
         info = {}
         reward = torch.Tensor([reward])
-        return self.dgl_g, reward, done, info  # Tensor so we can take it and appending
+        return self.dgl_g, reward, done, info
 
     def take_action(self, action, remove=False):
+        """
+        Actually take the action by adding or removing the edge between the action node and our node
+        :param action: index representing node being connected to
+        :param remove: boolean value indicating whether the edge should be added or removed
+        :return:
+        """
         neighbor_index = action
         neighbor_id = self.index_to_node[neighbor_index]
         if remove:
@@ -287,9 +293,8 @@ class NetworkEnvironment(Env):
             self.num_actions -= 1
         else:
             self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
-            self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)  # TODO: what if the graph is undirected
-            self.dgl_g.add_edges([neighbor_index, self.node_index],
-                                 [self.node_index, neighbor_index])
+            self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)
+            self.dgl_g.add_edges([neighbor_index, self.node_index], [self.node_index, neighbor_index])
             self.costs = torch.cat([self.costs, torch.Tensor([[0.1], [0.1]])])
             self.node_features[action, -1] = 1
             self.num_actions += 1
@@ -343,10 +348,10 @@ class NetworkEnvironment(Env):
         self.update_action_mask()
 
         self.num_actions = 0
-        # self.w_norm = sum(costs)
-        # self.btwn_cent = self.ig_g.betweenness(self.node_id, weights="cost") / self.norm
-        self.btwn_cent = 0
-        # self.btwn_cent = self.get_triangles()
+        if self.budget_offset < 2:
+            self.btwn_cent = 0
+        else:
+            self.btwn_cent = self.get_reward()
         return self.dgl_g
 
     def update_neighbor_vector(self):
