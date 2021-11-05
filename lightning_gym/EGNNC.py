@@ -1,25 +1,19 @@
-"""GCN using DGL nn package
-References:
-- Semi-Supervised Classification with Graph Convolutional Networks
-- Paper: https://arxiv.org/abs/1609.02907
-- Code: https://github.com/tkipf/gcn
-"""
 import torch.nn as nn
 from dgl.nn.pytorch import EdgeGraphConv
 from dgl import readout_nodes
 
 
-class EGNNC(nn.Module):  # Create GCN class
+class EGNNC(nn.Module):
     def __init__(self,
                  in_feats,
                  n_hidden,
                  n_classes,
                  n_layers,
                  activation,
-                 dropout=0.05
+                 dropout=0.10
                  ):
         """
-
+        Edge Exploiting Graph Neural Network
         :param in_feats: number of input features
         :param n_hidden: number of features in the hidden layers
         :param n_classes: number of features in the output layer
@@ -46,10 +40,10 @@ class EGNNC(nn.Module):  # Create GCN class
         '''
         h = g.ndata['features']  # Get features from graph
         for i, layer in enumerate(self.layers):
-            if i != 0:
-                h = self.dropout(h)
-            h = layer(g, h, edge_weight=w)  # Features after they been convoluted
+            # if i != len(self.layers)-1:
+            #     h = self.dropout(h)
+            h = layer(g, h, edge_weight=w)  # Features after they been convoluted, these represent the nodes
         g.ndata['h'] = h
-        mN = readout_nodes(g, 'h', op="mean")  # mean of those features
+        mN = readout_nodes(g, 'h', op="mean")  # column-wise average of those node features, this represents the graph
         g.ndata.pop('h')
         return h, mN
