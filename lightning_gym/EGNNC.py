@@ -23,7 +23,7 @@ class EGNNC(nn.Module):
         """
         super(EGNNC, self).__init__()
 
-        self.layers = nn.ModuleList()  # Create empty list of layers
+        self.layers = nn.ModuleList()
         # input layer
         self.layers.append(EdgeGraphConv(in_feats, n_hidden, norm="left", activation=activation))
         # hidden layers
@@ -34,10 +34,12 @@ class EGNNC(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, g, w):
-        '''
-        features pass to j
-        b_centralities, d_centralities, torch.Tensor(self.edge_vector).unsqueeze(-1)), dim=1
-        '''
+        """
+        Forward function defines how data is passed through the neural network.
+        :param g: graph itself (dgl graph)
+        :param w: tensor of edge weights
+        :return: h tensor of node out-features, mN the column-wise mean of these features
+        """
         h = g.ndata['features']  # Get features from graph
         for i, layer in enumerate(self.layers):
             # if i != len(self.layers)-1:
