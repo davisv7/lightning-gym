@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from collections import deque
 
 
 class Actor(nn.Module):
@@ -89,6 +90,7 @@ class DiscreteActorCritic:
         self.path = config.get("agent", "model_file")
         self.cuda = config.getboolean("agent", "cuda")
         self._load_model = config.getboolean("agent", "load_model")
+        # self.memory_replay_buffer = deque(maxlen=5000)
 
         # hyperparameters
         self.in_feats = config.getint("agent", "in_features")
@@ -100,7 +102,7 @@ class DiscreteActorCritic:
         self.num_episodes = 1
         self._test = kwargs.get("test", False)
 
-        # create the model for the ajay
+        # models
         self.model = EGNNC(self.in_feats, self.hid_feats, self.out_feats, n_layers=self.layers, activation=F.rrelu)
         self.actor = Actor(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
         self.critic = Critic(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
@@ -110,11 +112,17 @@ class DiscreteActorCritic:
         if self.cuda:
             self.model = self.model.cuda()
 
-        self.optimizer = torch.optim.Adam([
+        self.gcn_optimizer = torch.optim.Adam([
             # {'params': self.actor.parameters(), "lr": 1e-4},
             # {'params': self.critic.parameters(), "lr": 1e-4},
             {'params': self.model.parameters(), "lr": self.learning_rate}
         ])
+        self.lr_schedule = torch.optim.lr_scheduler.StepLR(self.gcn_optimizer, step_size=1, gamma=0.99)
+
+        # self.ac_optimizer = torch.optim.Adam([
+        #     {'params': self.actor.parameters(), "lr": 1e-4},
+        #     {'params': self.critic.parameters(), "lr": 1e-4},
+        # ])
 
     def print_actor_configuration(self):
         print("\tLoad model: {}".format(self._load_model),
@@ -159,6 +167,7 @@ class DiscreteActorCritic:
             R = torch.cat([R, reward.unsqueeze(0)], dim=0)
             # The Value we thought it would be ???????????
             V = torch.cat([V, val.unsqueeze(0)], dim=0)
+            # self.memory_replay_buffer.append([PI,R,V])
 
             # pirv = [pi[action], reward, val]  # pi,r,v
             # self.memory_replay_buffer.append(pirv)
@@ -167,11 +176,10 @@ class DiscreteActorCritic:
         # self.log.add_item('gains',np.flip(R.numpy()))
 
         # R = torch.Tensor(np.zeros_like(np.mean(R.numpy()), shape=self.problem.budget))
-        # R[0] = R[1] + 0
+        R[0] = R[1] + 0
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
-
         return PI, R, V, tot_return
 
     def predict_action(self, pi, illegal_actions):
@@ -198,9 +206,9 @@ class DiscreteActorCritic:
         return action
 
     def update_model(self, PI, R, V):
-        # R = (R - R.mean()) / (R.std() + 1e-10)
+        # R = (R - R.mean()) / (R.std() + 1e-10) # batch normalization?
         # V = (V - V.mean()) / (V.std() + 1e-10)
-        self.optimizer.zero_grad()  # needed to update parameter correctly
+        self.gcn_optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:
             R = R.cuda()
         A = (R.squeeze() - V.squeeze()).detach()
@@ -211,7 +219,9 @@ class DiscreteActorCritic:
         L_entropy = -(PI * PI.log()).mean()
         L = L_policy + L_value  # - 0.1 * L_entropy
         L.backward()
-        self.optimizer.step()
+        self.gcn_optimizer.step()
+        # self.ac_optimizer.step()
+        self.lr_schedule.step()
         self.problem.r_logger.add_log('td_error', L_value.detach().item())
         self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
 
