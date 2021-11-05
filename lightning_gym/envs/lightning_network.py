@@ -180,7 +180,7 @@ class NetworkEnvironment(Env):
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
         return reward
-        # return self.btwn_cent / self.num_actions
+        # return self.btwn_cent
 
     def get_triangles(self):
         """
