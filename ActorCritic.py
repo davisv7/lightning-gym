@@ -117,12 +117,12 @@ class DiscreteActorCritic:
             # {'params': self.critic.parameters(), "lr": 1e-4},
             {'params': self.model.parameters(), "lr": self.learning_rate}
         ])
-        self.lr_schedule = torch.optim.lr_scheduler.StepLR(self.gcn_optimizer, step_size=1, gamma=0.99)
+        self.lr_schedule = torch.optim.lr_scheduler.StepLR(self.gcn_optimizer, step_size=1, gamma=0.999)
 
-        # self.ac_optimizer = torch.optim.Adam([
-        #     {'params': self.actor.parameters(), "lr": 1e-4},
-        #     {'params': self.critic.parameters(), "lr": 1e-4},
-        # ])
+        self.ac_optimizer = torch.optim.Adam([
+            {'params': self.actor.parameters(), "lr": 1e-5},
+            {'params': self.critic.parameters(), "lr": 1e-5},
+        ])
 
     def print_actor_configuration(self):
         print("\tLoad model: {}".format(self._load_model),
@@ -176,7 +176,7 @@ class DiscreteActorCritic:
         # self.log.add_item('gains',np.flip(R.numpy()))
 
         # R = torch.Tensor(np.zeros_like(np.mean(R.numpy()), shape=self.problem.budget))
-        R[0] = R[1] + 0
+        # R[0] = R[1] + 0
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
@@ -220,7 +220,7 @@ class DiscreteActorCritic:
         L = L_policy + L_value  # - 0.1 * L_entropy
         L.backward()
         self.gcn_optimizer.step()
-        # self.ac_optimizer.step()
+        self.ac_optimizer.step()
         self.lr_schedule.step()
         self.problem.r_logger.add_log('td_error', L_value.detach().item())
         self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
