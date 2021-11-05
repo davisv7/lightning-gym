@@ -42,22 +42,11 @@ pi(v|S) := argmax_(v' in S^bar)(Q_hat(h(S),v')
 # Environment Class
 class NetworkEnvironment(Env):
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, g=None):
         """
-        :param
-        budget: number of channels that can add to graph
-        node_index: node parameter that want to test on
-        ig_g: igraph graph
-        dgl_g: dgl graph
-        btwn_cent: betweenness centrality
-        edge_vector: neighbors of a node, (1=neighbor, 0=not neighbor)
-        features: betweenness, degree, closeness, edge vector
-        r_logger: keeps track of reward
-        repeat: whether or not to repeat
-        budget_offset: how many edges the nodes started off with
-        nx_graph: networkX graph
-        k: size of subgraph
-        params = kwards: pass keywords
+        Initializes NetworkEnvironment
+        :param config: contains config variables related to the agent and environment
+        :param g: optional argument to pass a graph instead of randomly generating one.
         """
         self.budget = config.getint("env", "budget")
         self.node_id = config.get("env", "node_id")
@@ -65,29 +54,38 @@ class NetworkEnvironment(Env):
         self.graph_type = config.get("env", "graph_type")
         self.filename = config.get("env", "filename")
         self.cutoff = config.getint("env", "cutoff")
+        self.n = config.getint("env", "n", fallback=None)
         self.config = config
 
-        self.index_to_node = bidict()
-        self.r_logger = Logger()
-        self.node_index = None
+        # graphs
+        self.base_graph = g
+        self.nx_graph = None
         self.ig_g = None
         self.dgl_g = None
+
+        # useful attributes if node_id is not default
+        self.budget_offset = 0
+        self.action_mask = None
+        self.preexisting_neighbors = None
+
+        # features
         self.costs = None
         self.e_btwns = None
-        self.graph_size = None
-        self.btwn_cent = 0
+        self.node_features = None
+
+        # related to game state
         self.node_vector = None
-        self.features = None
-        self.budget_offset = 0
-        self.nx_graph = None
-        self.base_graph = kwargs.get("g", None)
-        self.norm = None
+        self.btwn_cent = 0
         self.num_actions = 0
-        self.n = config.getint("env", "n", fallback=None)
-        self.action_mask = None
-        self.neighbors = None
+
+        self.node_index = None
+        self.graph_size = None
+        self.norm = None
+        self.index_to_node = bidict()
         self.default_node_ids = ["", None, self.n]
-        self.hop_limit = 20  # the lnd protocol does not allow payments with more than 20 intermediaries
+        self.r_logger = Logger()
+
+        # make sure a valid graph type is being used
         valid_types = ['snapshot', 'random_snapshot', 'scale_free']
         assert self.graph_type in valid_types, "\nYou must use one of the following graphs types:\n\t{}".format(
             ',\n\t'.join(valid_types))
@@ -100,17 +98,18 @@ class NetworkEnvironment(Env):
               Graph Type: {}
               Repeat State: {}""".format(self.budget, self.node_id, self.graph_type, self.repeat)
 
-    def update_features(self):
+    def update_node_features(self):
         """
         Assigns to each node a feature vector containing including but not limited to:
         closeness centrality: the average cost to send funds to/from this node from/to other nodes in the network
         degree centrality: the fraction of edges incident to the node relative to the total number of edges
         load centrality: similar to betweenness centrality, except it only considers one cheapest path versus all
-        strengths: sum of out weights divided the max of the sum of these outweights
+        strengths: sum of out weights divided the max of the sum of these out weights
+        node vector: 0-1 vector indicating which nodes the agent is adjacent to
         :return:
         """
 
-        if self.features is None or not self.repeat:
+        if self.node_features is None or not self.repeat:
             # costs = self.ig_g.es["cost"]
             # node_indices = self.ig_g.vs().indices
             # norm = (self.graph_size * (self.graph_size - 1))
@@ -146,17 +145,17 @@ class NetworkEnvironment(Env):
             #     # l_centralities,
             #     # strengths,
             #     self.node_vector.unsqueeze(-1)), dim=1)
-            self.features = self.node_vector.unsqueeze(-1)
+            self.node_features = self.node_vector.unsqueeze(-1)
         else:
-            self.features[:, -1] = self.node_vector
-        self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
+            self.node_features[:, -1] = self.node_vector
+        self.dgl_g.ndata['features'] = self.node_features  # pass down features to dgl
 
     def get_illegal_actions(self):
         """
         A node is illegal if the agent is already connected to that node, or if it is masked by the action mask
         :return:
         """
-        illegal = ((self.node_vector + self.action_mask + self.neighbors) > 0.).nonzero()
+        illegal = ((self.node_vector + self.action_mask + self.preexisting_neighbors) > 0.).nonzero()
         return illegal
 
     def get_legal_actions(self):
@@ -164,7 +163,7 @@ class NetworkEnvironment(Env):
         A node is legal if the agent is not already connected to that node, and if it is not masked by the action mask
         :return:
         """
-        legal = ((self.node_vector + self.action_mask + self.neighbors) == 0.).nonzero()
+        legal = ((self.node_vector + self.action_mask + self.preexisting_neighbors) == 0.).nonzero()
         return legal
 
     def get_reward(self):
@@ -284,7 +283,7 @@ class NetworkEnvironment(Env):
         neighbor_id = self.index_to_node[neighbor_index]
         if remove:
             self.ig_g.delete_edges((neighbor_id, self.node_id))
-            self.features[action, -1] = 0
+            self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:
             self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
@@ -292,10 +291,10 @@ class NetworkEnvironment(Env):
             self.dgl_g.add_edges([neighbor_index, self.node_index],
                                  [self.node_index, neighbor_index])
             self.costs = torch.cat([self.costs, torch.Tensor([[0.1], [0.1]])])
-            self.features[action, -1] = 1
+            self.node_features[action, -1] = 1
             self.num_actions += 1
 
-        self.dgl_g.ndata['features'] = self.features
+        self.dgl_g.ndata['features'] = self.node_features
 
     def load_graph(self):
         if self.graph_type == 'snapshot':
@@ -340,7 +339,7 @@ class NetworkEnvironment(Env):
 
         self.budget_offset = 0
         self.update_neighbor_vector()
-        self.update_features()
+        self.update_node_features()
         self.update_action_mask()
 
         self.num_actions = 0
@@ -350,46 +349,17 @@ class NetworkEnvironment(Env):
         # self.btwn_cent = self.get_triangles()
         return self.dgl_g
 
-    def draw_graph(self):
-        if self.graph_type == 'snapshot':
-            nx.draw(self.nx_graph,
-                    node_color='blue',
-                    edge_color='yellow',
-                    node_size=150,
-                    node_shape='.'
-                    )
-            plt.show()
-
-        elif self.graph_type == 'sub_graph':
-            nx.draw(self.nx_graph,
-                    node_color='red',
-                    edge_color='green',
-                    node_size=150,
-                    node_shape='h'
-                    )
-            plt.show()
-
-        elif self.graph_type == 'scale_free':
-            nx.draw(self.nx_graph,
-                    node_color='purple',
-                    edge_color='pink',
-                    with_labels=True,
-                    node_size=150,
-                    node_shape='h'
-                    )
-            plt.show()
-
     def update_neighbor_vector(self):
         # Create a vector of zeros to the length of the graph_size
         self.node_vector = torch.zeros(self.graph_size)
-        if self.neighbors is None or not self.repeat:
-            self.neighbors = torch.zeros(self.graph_size)
+        if self.preexisting_neighbors is None or not self.repeat:
+            self.preexisting_neighbors = torch.zeros(self.graph_size)
             if self.node_id not in self.default_node_ids:
                 incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
                 if incident_edges:
                     vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
                     vertices = vertices[vertices != self.node_index].type(torch.long)
-                    self.neighbors = self.neighbors.put(vertices, torch.ones(len(vertices)))
+                    self.preexisting_neighbors = self.preexisting_neighbors.put(vertices, torch.ones(len(vertices)))
                     self.budget_offset = len(vertices)
 
     def add_node(self, node_id):
