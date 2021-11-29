@@ -46,6 +46,6 @@ class EGNNC(nn.Module):
             #     h = self.dropout(h)
             h = layer(g, h, edge_weight=w)  # Features after they been convoluted, these represent the nodes
         g.ndata['h'] = h
-        mN = readout_nodes(g, 'h', op="mean")  # column-wise average of those node features, this represents the graph
+        mN = readout_nodes(g, 'h', op="sum")  # column-wise average of those node features, this represents the graph
         g.ndata.pop('h')
         return h, mN

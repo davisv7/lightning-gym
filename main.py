@@ -8,8 +8,12 @@ import configparser
 import random
 import numpy as np
 import torch
+from lightning_gym.utils import random_seed
 from lightning_gym.graph_utils import undirected, down_sample
 from DQN import DQNAgent
+
+# SEED = 4565168
+# random_seed(SEED)
 
 
 def main():
@@ -28,9 +32,8 @@ def main():
     ds = config.getboolean("env", "down_sample")
 
     if seed:
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+        print("seed set")
+        random_seed(seed)
     nodes, edges = load_json(path.join(getcwd(), json_filename))
 
     # clean nodes

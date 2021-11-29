@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import deque
+from Memory import ReplayMemory, Transition
 
 
 class Actor(nn.Module):
@@ -90,7 +91,7 @@ class DiscreteActorCritic:
         self.path = config.get("agent", "model_file")
         self.cuda = config.getboolean("agent", "cuda")
         self._load_model = config.getboolean("agent", "load_model")
-        # self.memory_replay_buffer = deque(maxlen=5000)
+        # self.memory_replay_buffer = ReplayMemory(5000)
 
         # hyperparameters
         self.in_feats = config.getint("agent", "in_features")
@@ -138,6 +139,7 @@ class DiscreteActorCritic:
         PI = torch.empty(0)  # policy network
         R = torch.empty(0)  # reward
         V = torch.empty(0)  # value network
+        old_state = None
 
         while not done:  # While we haven't exceeded budget
             # Use this if we have an NVIDIA graphics card (we don't)
@@ -167,12 +169,15 @@ class DiscreteActorCritic:
             R = torch.cat([R, reward.unsqueeze(0)], dim=0)
             # The Value we thought it would be ???????????
             V = torch.cat([V, val.unsqueeze(0)], dim=0)
-            # self.memory_replay_buffer.append([PI,R,V])
 
-            # pirv = [pi[action], reward, val]  # pi,r,v
-            # self.memory_replay_buffer.append(pirv)
+            # if old_state is None:
+            #     old_state = mN
+            # else:
+            #     sars = [old_state, action.unsqueeze(-1), reward, mN]
+            #     self.memory_replay_buffer.push(*sars)
+            #     old_state = mN
 
-        tot_return = R.sum().item()
+        # tot_return = R.sum().item()
         # self.log.add_item('gains',np.flip(R.numpy()))
 
         # R = torch.Tensor(np.zeros_like(np.mean(R.numpy()), shape=self.problem.budget))
@@ -180,7 +185,7 @@ class DiscreteActorCritic:
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
-        return PI, R, V, tot_return
+        return PI, R, V
 
     def predict_action(self, pi, illegal_actions):
         # Remove the dimensions of size one
@@ -201,7 +206,7 @@ class DiscreteActorCritic:
             action = probs.argmax()
         else:
             action = dist.sample()
-            # action = np.random.choice(list(range(len(probs))), replace=False, p=probs)
+            # action = np.random.choice(np.arange(len(probs)), size=1, p=probs)[0]
             # action = choice([dist.probs.argmax, dist.sample])()
         return action
 
@@ -209,6 +214,7 @@ class DiscreteActorCritic:
         # R = (R - R.mean()) / (R.std() + 1e-10) # batch normalization?
         # V = (V - V.mean()) / (V.std() + 1e-10)
         self.gcn_optimizer.zero_grad()  # needed to update parameter correctly
+        self.ac_optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:
             R = R.cuda()
         A = (R.squeeze() - V.squeeze()).detach()
@@ -220,7 +226,7 @@ class DiscreteActorCritic:
         L = L_policy + L_value  # - 0.1 * L_entropy
         L.backward()
         self.gcn_optimizer.step()
-        self.ac_optimizer.step()
+        # self.ac_optimizer.step()
         self.lr_schedule.step()
         self.problem.r_logger.add_log('td_error', L_value.detach().item())
         self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
@@ -245,9 +251,9 @@ class DiscreteActorCritic:
 
     # Run so many numbers of episode then run the model
     def train(self):
-        [PI, R, V, _] = self.run_episode()  # getting new json file, getting new graph/ subgraph
+        [PI, R, V] = self.run_episode()  # getting new json file, getting new graph/ subgraph
         for i in range(self.num_episodes - 1):  # for each range in episodes, why do have episodes = 1???
-            [pi, r, v, _] = self.run_episode()
+            [pi, r, v] = self.run_episode()
             # Update model
             PI = torch.cat([PI, pi], dim=0)  # Appending what learned to previous pi
             R = torch.cat([R, r], dim=0)

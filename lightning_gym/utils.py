@@ -3,6 +3,11 @@ import networkx as nx
 from os import getcwd, path, listdir
 from random import choice
 import itertools
+import random
+import numpy as np
+import torch
+import dgl
+import igraph
 
 
 def get_random_filename():
@@ -31,3 +36,16 @@ def print_config(config):
         print(section)
         for option in config[section]:
             print(f"\t{option} = {config.get(section, option)}")
+
+
+def random_seed(seed_value, use_cuda=False):
+    np.random.seed(seed_value)  # cpu vars
+    torch.manual_seed(seed_value)  # cpu  vars
+    torch.use_deterministic_algorithms(True)
+    random.seed(seed_value)  # Python
+    dgl.seed(seed_value)
+    if use_cuda:
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value)  # gpu vars
+        torch.backends.cudnn.deterministic = True  # needed
+        torch.backends.cudnn.benchmark = False

@@ -39,7 +39,7 @@ class GCN(nn.Module):
         self.layers.append(GraphConv(hid_feats, out_feats, norm="left"))
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, g):
+    def forward(self, g, w=None):
         """
         Forward function defines how data is passed through the neural network.
         :param g: graph itself (dgl graph)
