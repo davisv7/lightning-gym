@@ -5,15 +5,8 @@ from lightning_gym.utils import print_config
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 from ActorCritic import DiscreteActorCritic
 import configparser
-import random
-import numpy as np
-import torch
 from lightning_gym.utils import random_seed
 from lightning_gym.graph_utils import undirected, down_sample
-from DQN import DQNAgent
-
-# SEED = 4565168
-# random_seed(SEED)
 
 
 def main():
@@ -60,15 +53,6 @@ def main():
         g = undirected(g)
     if graph_filters.getboolean("unweighted"):
         nx.set_edge_attributes(g, values=0.1, name='cost')
-    """
-    at this point, we should have a graph with the following properties:
-    - no multi-edges, in favor of whichever edge has the highest cost, capacities are combined
-    - nodes whose degree is >= 2
-    - nodes/edges whose deletion will not create a subgraph
-    - nodes whose adjacent edges all have cycles
-    - non-disabled edges with some minimum capacity
-    - edges that have defined policies
-    """
 
     print(len(g.nodes()), len(g.edges()))
 

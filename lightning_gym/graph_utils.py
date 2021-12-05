@@ -46,7 +46,7 @@ def get_snapshot(filename):
 
 
 def random_scale_free(k):
-    return nx.scale_free_graph(k, 0.8, 0.1, 0.1)
+    return nx.DiGraph(nx.scale_free_graph(k, 0.8, 0.1, 0.1))
 
 
 def nx_to_ig(nx_graph, add_self_loop=True):
@@ -60,7 +60,7 @@ def nx_to_ig(nx_graph, add_self_loop=True):
     for node in nx_graph.nodes():  # n nodes into the nk_graph
         ig_g.add_vertex(name=node)
         if add_self_loop:
-            ig_g.add_edges([(node, node)], {'cost': [1e3], 'capacity': [0]})
+            ig_g.add_edges([(node, node)], {'cost': [1e9], 'capacity': [0]})
 
     for u, v in nx_graph.edges():
         c1 = nx_graph[u][v].get('cost', 0.1)

@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 from lightning_gym.GCN import GCN
 from lightning_gym.EGNNC import EGNNC
-from lightning_gym.SAGE import SAGE
 from collections import deque
 from random import sample
 import numpy as np
@@ -10,7 +9,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import deque
-from Memory import ReplayMemory, Transition
 
 
 class Actor(nn.Module):
@@ -104,7 +102,7 @@ class DiscreteActorCritic:
         self._test = kwargs.get("test", False)
 
         # models
-        self.model = EGNNC(self.in_feats, self.hid_feats, self.out_feats, n_layers=self.layers, activation=F.rrelu)
+        self.model = GCN(self.in_feats, self.hid_feats, self.out_feats, n_layers=self.layers, activation=F.rrelu)
         self.actor = Actor(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
         self.critic = Critic(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
 
@@ -158,6 +156,8 @@ class DiscreteActorCritic:
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
 
+            # print(action.item(), end=" ")
+
             # take action
             G, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs
             illegal_actions = self.problem.get_illegal_actions()
@@ -185,6 +185,8 @@ class DiscreteActorCritic:
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
+
+        # print()
         return PI, R, V
 
     def predict_action(self, pi, illegal_actions):
@@ -224,6 +226,7 @@ class DiscreteActorCritic:
         L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
         L_entropy = -(PI * PI.log()).mean()
         L = L_policy + L_value  # - 0.1 * L_entropy
+        # print(L.item())
         L.backward()
         self.gcn_optimizer.step()
         # self.ac_optimizer.step()
