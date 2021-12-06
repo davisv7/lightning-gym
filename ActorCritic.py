@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import deque
+from lightning_gym.Logger import Logger
 
 
 class Actor(nn.Module):
@@ -100,6 +101,7 @@ class DiscreteActorCritic:
         self.learning_rate = config.getfloat("agent", "learning_rate")
         self.num_episodes = 1
         self._test = kwargs.get("test", False)
+        self.logger = Logger()
 
         # models
         self.model = GCN(self.in_feats, self.hid_feats, self.out_feats, n_layers=self.layers, activation=F.rrelu)
@@ -177,16 +179,10 @@ class DiscreteActorCritic:
             #     self.memory_replay_buffer.push(*sars)
             #     old_state = mN
 
-        # tot_return = R.sum().item()
-        # self.log.add_item('gains',np.flip(R.numpy()))
-
-        # R = torch.Tensor(np.zeros_like(np.mean(R.numpy()), shape=self.problem.budget))
-        # R[0] = R[1] + 0
+        self.logger.add_log('tot_reward', self.problem.btwn_cent)
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
-
-        # print()
         return PI, R, V
 
     def predict_action(self, pi, illegal_actions):
@@ -231,8 +227,8 @@ class DiscreteActorCritic:
         self.gcn_optimizer.step()
         # self.ac_optimizer.step()
         self.lr_schedule.step()
-        self.problem.r_logger.add_log('td_error', L_value.detach().item())
-        self.problem.r_logger.add_log('entropy', L_entropy.cpu().detach().item())
+        self.logger.add_log('td_error', L_value.detach().item())
+        self.logger.add_log('entropy', L_entropy.cpu().detach().item())
 
     # def memory_replay(self):
     #     self.optimizer.zero_grad()  # needed to update parameter correctly
@@ -263,7 +259,7 @@ class DiscreteActorCritic:
             V = torch.cat([V, v], dim=0)
         # self.memory_replay()
         self.update_model(PI, R, V)
-        return self.problem.r_logger
+        return self.logger
 
     def test(self):
         [_, _, _, _] = self.run_episode()

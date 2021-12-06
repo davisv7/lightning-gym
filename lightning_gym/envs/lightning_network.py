@@ -54,7 +54,6 @@ class NetworkEnvironment(Env):
         self.norm = None
         self.index_to_node = bidict()
         self.default_node_ids = ["", None, self.n]
-        self.r_logger = Logger()
 
         # make sure a valid graph type is being used
         valid_types = ['snapshot', 'random_snapshot', 'scale_free']
@@ -92,7 +91,7 @@ class NetworkEnvironment(Env):
         :return:
         """
         # new_btwn = self.ig_g.betweenness(self.node_id) / self.norm
-        new_btwn = self.ig_g.betweenness(self.node_id, weights="cost") / self.norm
+        new_btwn = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
         # new_btwn = nx.betweenness_centrality(self.nx_graph, weight="cost", seed=5785)[self.node_id]
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
@@ -132,7 +131,6 @@ class NetworkEnvironment(Env):
             # self.get_reward()
             # reward = self.btwn_cent
             done = True
-            self.r_logger.add_log('tot_reward', self.btwn_cent)
         info = {}
         reward = torch.Tensor([reward])
         return self.dgl_g, reward, done, info
@@ -148,7 +146,7 @@ class NetworkEnvironment(Env):
         neighbor_id = self.index_to_node[neighbor_index]
         if remove:
             self.ig_g.delete_edges((neighbor_id, self.node_id))
-            self.ig_g.delete_edges((self.node_id,neighbor_id))
+            self.ig_g.delete_edges((self.node_id, neighbor_id))
             self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:

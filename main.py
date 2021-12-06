@@ -68,10 +68,11 @@ def main():
         print("E: {}, R: {:.4f}, N:{}".format(episode, log.log['tot_reward'][-1], recommendations))
         # ajay.save_model()
 
-    print('total reward: ', env.r_logger.log['tot_reward'])
-    print("td error: ", env.r_logger.log['td_error'])
-    print("entropy: ", env.r_logger.log['entropy'])
-    env.r_logger.plot_logger()
+    print('total reward: ', ajay.logger.log['tot_reward'])
+    print("td error: ", ajay.logger.log['td_error'])
+    print("entropy: ", ajay.logger.log['entropy'])
+    ajay.logger.plot_reward()
+    ajay.logger.plot_td_error()
 
 
 if __name__ == '__main__':
