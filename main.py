@@ -7,7 +7,7 @@ from ActorCritic import DiscreteActorCritic
 import configparser
 from lightning_gym.utils import random_seed
 from lightning_gym.graph_utils import undirected, down_sample
-from baselines import RandomAgent, EsroyAgent
+from baselines import RandomAgent, ErsoyAgent
 
 
 def main():
@@ -62,7 +62,7 @@ def main():
     # env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
     rando = RandomAgent(env)
-    roy = EsroyAgent(env)
+    soy = ErsoyAgent(env)
 
     num_episodes = config.getint("training", "episodes")
     for episode in range(num_episodes):
@@ -74,13 +74,12 @@ def main():
     ajay._test = True
     print("Test Results:", ajay.test())
     print("Random Results:", rando.run_episode())
-    print("Esroy Results:", roy.run_episode())
-
+    print("Esroy Results:", soy.run_episode())
     print('total reward: ', ajay.logger.log['tot_reward'])
     print("td error: ", ajay.logger.log['td_error'])
     print("entropy: ", ajay.logger.log['entropy'])
-    ajay.logger.plot_reward()
-    ajay.logger.plot_td_error()
+    # ajay.logger.plot_reward()
+    # ajay.logger.plot_td_error()
 
 
 if __name__ == '__main__':
