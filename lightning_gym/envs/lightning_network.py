@@ -40,7 +40,7 @@ class NetworkEnvironment(Env):
         self.preexisting_neighbors = None
 
         # features
-        self.costs = None
+        # self.costs = None
         self.e_btwns = None
         self.node_features = None
 
@@ -121,7 +121,7 @@ class NetworkEnvironment(Env):
             '''
             self.node_vector[action] = 0  # mark channel for deletion
             self.take_action(action, remove=True)
-            # reward = 1.01 * self.get_reward()
+            reward = self.get_reward()
         else:
             self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
@@ -147,13 +147,15 @@ class NetworkEnvironment(Env):
         if remove:
             self.ig_g.delete_edges((neighbor_id, self.node_id))
             self.ig_g.delete_edges((self.node_id, neighbor_id))
+            self.dgl_g.remove_edges(torch.tensor([neighbor_index, self.node_index]))
+            self.dgl_g.remove_edges(torch.tensor([self.node_index, neighbor_index]))
             self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:
             self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
             self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)
-            self.dgl_g.add_edges([neighbor_index, self.node_index], [self.node_index, neighbor_index])
-            self.costs = torch.cat([self.costs, torch.Tensor([[0.1], [0.1]])])
+            self.dgl_g.add_edges(torch.tensor([neighbor_index, self.node_index]),
+                                 torch.tensor([self.node_index, neighbor_index]))
             self.node_features[action, -1] = 1
             self.num_actions += 1
 
@@ -194,11 +196,11 @@ class NetworkEnvironment(Env):
         self.norm = (self.graph_size * (self.graph_size - 1))
 
         # reset edge attribute: cost
-        self.costs = self.ig_g.es["cost"]
-        cost_sum = np.sum(self.costs)
-        cost_mean = cost_sum / len(self.costs)
-        self.costs = self.costs / cost_mean
-        self.costs = torch.Tensor(self.costs).unsqueeze(-1)
+        # self.costs = self.ig_g.es["cost"]
+        # cost_sum = np.sum(self.costs)
+        # cost_mean = cost_sum / len(self.costs)
+        # self.costs = self.costs / cost_mean
+        # self.costs = torch.Tensor(self.costs).unsqueeze(-1)
 
         self.budget_offset = 0
         self.node_vector = torch.zeros(self.graph_size)

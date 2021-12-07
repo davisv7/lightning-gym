@@ -147,11 +147,11 @@ class DiscreteActorCritic:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
             # convolve our graph
-            costs = self.problem.costs
+            # costs = self.problem.costs
             # betweennesses = self.problem.e_btwns
             # weights = torch.cat((betweennesses, costs), dim=-1)
-            [h, mN] = self.model(G, w=costs)
-            # [h, mN] = self.model(G)
+            # [h, mN] = self.model(G, w=costs)
+            [h, mN] = self.model(G)
             pi = self.actor(h)
             val = self.critic(mN)
 
@@ -178,8 +178,8 @@ class DiscreteActorCritic:
             #     sars = [old_state, action.unsqueeze(-1), reward, mN]
             #     self.memory_replay_buffer.push(*sars)
             #     old_state = mN
-
-        self.logger.add_log('tot_reward', self.problem.btwn_cent)
+        if not self._test:
+            self.logger.add_log('tot_reward', self.problem.btwn_cent)
         # discount past rewards, rewards of the past are worth less
         for i in range(R.shape[0] - 1):
             R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
@@ -262,8 +262,8 @@ class DiscreteActorCritic:
         return self.logger
 
     def test(self):
-        [_, _, _, _] = self.run_episode()
-        return self.problem.r_logger
+        [_, _, _] = self.run_episode()
+        return self.problem.btwn_cent
 
     def save_model(self):  # takes what we learned
         torch.save(self.model.state_dict(), self.path)

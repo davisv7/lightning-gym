@@ -7,6 +7,7 @@ from ActorCritic import DiscreteActorCritic
 import configparser
 from lightning_gym.utils import random_seed
 from lightning_gym.graph_utils import undirected, down_sample
+from baselines import RandomAgent, EsroyAgent
 
 
 def main():
@@ -60,6 +61,8 @@ def main():
     env = NetworkEnvironment(config, g=g)
     # env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
+    rando = RandomAgent(env)
+    roy = EsroyAgent(env)
 
     num_episodes = config.getint("training", "episodes")
     for episode in range(num_episodes):
@@ -67,6 +70,11 @@ def main():
         recommendations = env.get_recommendations()
         print("E: {}, R: {:.4f}, N:{}".format(episode, log.log['tot_reward'][-1], recommendations))
         # ajay.save_model()
+
+    ajay._test = True
+    print("Test Results:", ajay.test())
+    print("Random Results:", rando.run_episode())
+    print("Esroy Results:", roy.run_episode())
 
     print('total reward: ', ajay.logger.log['tot_reward'])
     print("td error: ", ajay.logger.log['td_error'])
