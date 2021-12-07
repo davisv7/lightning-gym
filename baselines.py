@@ -1,8 +1,9 @@
 import numpy as np
+from lightning_gym.envs.lightning_network import NetworkEnvironment
 
 
-class EsroyAgent:
-    def __init__(self, problem):
+class ErsoyAgent:
+    def __init__(self, problem: NetworkEnvironment):
         self.problem = problem  # environment
 
     def run_episode(self):  # similar to epochs
@@ -14,7 +15,7 @@ class EsroyAgent:
             action = self.pick_greedy_action()
 
             # take action
-            _, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs
+            _, reward, done, _ = self.problem.step(action)  # Take action and find outputs
 
         return self.problem.btwn_cent
 
@@ -22,7 +23,11 @@ class EsroyAgent:
         legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
         best_action = None
         if self.problem.num_actions + self.problem.budget_offset < 2:
-            pass
+            vs = self.problem.ig_g.vs()
+            node_to_degree = {v["name"]: self.problem.ig_g.degree(v) for v in vs}
+            legal_nodes = [self.problem.index_to_node[index] for index in legal_actions]
+            best_node = max(legal_nodes, key=lambda x: node_to_degree[x])
+            best_action = self.problem.index_to_node.inverse[best_node]
         else:
             best_reward = 0
             for action in legal_actions:
