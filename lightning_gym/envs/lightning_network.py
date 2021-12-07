@@ -55,6 +55,8 @@ class NetworkEnvironment(Env):
         self.index_to_node = bidict()
         self.default_node_ids = ["", None, self.n]
 
+        self.reward_dict = dict() # memoization
+
         # make sure a valid graph type is being used
         valid_types = ['snapshot', 'random_snapshot', 'scale_free']
         assert self.graph_type in valid_types, "\nYou must use one of the following graphs types:\n\t{}".format(
@@ -90,9 +92,16 @@ class NetworkEnvironment(Env):
         Could also be represented by the betweenness of the most recently added edge.
         :return:
         """
-        # new_btwn = self.ig_g.betweenness(self.node_id) / self.norm
-        new_btwn = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
-        # new_btwn = nx.betweenness_centrality(self.nx_graph, weight="cost", seed=5785)[self.node_id]
+        if self.repeat:
+            key = "".join(list(map(str,self.get_recommendations())))
+            if key in self.reward_dict:
+                new_btwn = self.reward_dict[key]
+            else:
+                new_btwn = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+                self.reward_dict[key] = new_btwn
+        else:
+            new_btwn = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+
         reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
         # return reward
@@ -148,7 +157,7 @@ class NetworkEnvironment(Env):
             self.ig_g.delete_edges((neighbor_id, self.node_id))
             self.ig_g.delete_edges((self.node_id, neighbor_id))
             self.dgl_g.remove_edges(torch.tensor([neighbor_index, self.node_index]))
-            self.dgl_g.remove_edges(torch.tensor([self.node_index, neighbor_index]))
+            # self.dgl_g.remove_edges(torch.tensor([self.node_index, neighbor_index]))
             self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:
