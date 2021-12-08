@@ -2,7 +2,6 @@ from gym import Env
 from bidict import bidict
 import dgl
 import torch
-from ..Logger import Logger
 from ..graph_utils import *
 from os import getcwd, path
 
@@ -55,7 +54,7 @@ class NetworkEnvironment(Env):
         self.index_to_node = bidict()
         self.default_node_ids = ["", None, self.n]
 
-        self.reward_dict = dict() # memoization
+        self.reward_dict = dict()  # memoization
 
         # make sure a valid graph type is being used
         valid_types = ['snapshot', 'random_snapshot', 'scale_free']
@@ -93,7 +92,7 @@ class NetworkEnvironment(Env):
         :return:
         """
         if self.repeat:
-            key = "".join(list(map(str,self.get_recommendations())))
+            key = "".join(list(map(str, self.get_recommendations())))
             if key in self.reward_dict:
                 new_btwn = self.reward_dict[key]
             else:
@@ -106,6 +105,9 @@ class NetworkEnvironment(Env):
         self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
         # return reward
         return self.btwn_cent
+
+    def get_closeness(self):
+        return self.ig_g.closeness(self.node_id, mode="out", weights="cost") / self.norm
 
     def get_recommendations(self):
         """
@@ -202,7 +204,7 @@ class NetworkEnvironment(Env):
         # create dgl graph and igraph from nx_graph
         self.ig_g = nx_to_ig(self.nx_graph)
         self.dgl_g = dgl.from_networkx(self.nx_graph).add_self_loop()
-        self.norm = (self.graph_size * (self.graph_size - 1))
+        self.norm = (self.graph_size - 1) * (self.graph_size - 2)
 
         # reset edge attribute: cost
         # self.costs = self.ig_g.es["cost"]
