@@ -186,6 +186,8 @@ class DiscreteActorCritic:
         return PI, R, V
 
     def predict_action(self, pi, illegal_actions):
+        # th_layer = nn.Threshold(1, 0)
+        # pi = th_layer(pi)
         # Remove the dimensions of size one
         pi = pi.squeeze()
         # For all the indices that are illegal set the distribution to negative infinity
