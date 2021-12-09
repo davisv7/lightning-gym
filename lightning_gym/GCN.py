@@ -7,6 +7,7 @@ References:
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
 from dgl import readout_nodes
+from copy import deepcopy
 
 
 class GCN(nn.Module):
@@ -45,7 +46,7 @@ class GCN(nn.Module):
         :param g: graph itself (dgl graph)
         :return: h tensor of node out-features, mN the column-wise mean of these features
         """
-        h = g.ndata['features']  # Get features from graph
+        h = deepcopy(g.ndata['features'])  # Get features from graph
         for i, layer in enumerate(self.layers):
             # if i != len(self.layers) - 1:
             #     h = self.dropout(h)
