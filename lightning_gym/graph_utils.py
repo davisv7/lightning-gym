@@ -57,15 +57,20 @@ def nx_to_ig(nx_graph, add_self_loop=True):
     :return:
     """
     ig_g = ig.Graph()
-    for node in nx_graph.nodes():  # n nodes into the nk_graph
+    edge_list = []
+    costs = []
+
+    for node in nx_graph.nodes():
         ig_g.add_vertex(name=node)
         if add_self_loop:
-            ig_g.add_edges([(node, node)], {'cost': [1e9], 'capacity': [0]})
+            edge_list.append((node, node))
+            costs.append(1e9)
 
     for u, v in nx_graph.edges():
-        c1 = nx_graph[u][v].get('cost', 0.1)
-        capacity = nx_graph[u][v].get('capacity')
-        ig_g.add_edges([(u, v)], {'cost': [c1], 'capacity': [capacity]})  # slightly less overhead than add_edge
+        c1 = float(nx_graph[u][v].get('cost', 0.1))
+        edge_list.append((u, v))
+        costs.append(c1)
+    ig_g.add_edges(edge_list, {'cost': costs})
     return ig_g
 
 
