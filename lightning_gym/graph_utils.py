@@ -70,6 +70,11 @@ def nx_to_ig(nx_graph, add_self_loop=True):
         c1 = float(nx_graph[u][v].get('cost', 0.1))
         edge_list.append((u, v))
         costs.append(c1)
+    # max_cost = max(costs)
+    # if add_self_loop:
+    #     for node in nx_graph.nodes():
+    #         edge_list.append((node, node))
+    #         costs.append(2*max_cost)
     ig_g.add_edges(edge_list, {'cost': costs})
     return ig_g
 
