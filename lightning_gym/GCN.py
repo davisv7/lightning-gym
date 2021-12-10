@@ -16,7 +16,6 @@ class GCN(nn.Module):
                  out_feats,
                  n_layers,
                  activation,
-                 dropout=0.10
                  ):
         """
         Graph Convolutional Network Class
@@ -28,18 +27,27 @@ class GCN(nn.Module):
         :param dropout:
         """
         super(GCN, self).__init__()
+        self.policy = nn.Linear(out_feats, 1)
+        self.value = nn.Linear(out_feats, 1, )
 
         self.layers = nn.ModuleList()
-        # input layer
-        self.layers.append(GraphConv(in_feats, hid_feats, norm="left", activation=activation))
-        # hidden layers
-        for i in range(n_layers - 2):
-            self.layers.append(GraphConv(hid_feats, hid_feats, norm="left", activation=activation))
-        # output layer
-        self.layers.append(GraphConv(hid_feats, out_feats, norm="left"))
-        self.dropout = nn.Dropout(p=dropout)
+        if n_layers == 1:
+            hid_feats = out_feats
+            activation = None
 
-    def forward(self, g, w=None):
+        # hidden layers
+        for i in range(n_layers):
+            if i == 0:
+                # input layer
+                self.layers.append(GraphConv(in_feats, hid_feats, norm="left", activation=activation))
+            elif i != n_layers - 1:
+                # hidden layer
+                self.layers.append(GraphConv(hid_feats, hid_feats, norm="left", activation=activation))
+            else:
+                # output layer
+                self.layers.append(GraphConv(hid_feats, out_feats, norm="left"))
+
+    def forward(self, g):
         """
         Forward function defines how data is passed through the neural network.
         :param g: graph itself (dgl graph)
@@ -47,9 +55,9 @@ class GCN(nn.Module):
         """
         h = g.ndata['features']  # Get features from graph
         for i, layer in enumerate(self.layers):
-            # if i != len(self.layers) - 1:
-            #     h = self.dropout(h)
             h = layer(g, h)  # Features after they been convoluted, these represent the nodes
         g.ndata['h'] = h
         mN = readout_nodes(g, 'h', op="mean")  # column-wise average of those node features, this represents the graph
-        return h, mN
+        PI = self.policy(h)
+        V = self.value(mN)
+        return PI, V
