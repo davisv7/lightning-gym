@@ -1,86 +1,7 @@
-import torch
-import torch.nn.functional as F
 from lightning_gym.GCN import GCN
-from lightning_gym.EGNNC import EGNNC
-from collections import deque
-from random import sample
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from collections import deque
 from lightning_gym.Logger import Logger
-
-
-class Actor(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes=1,
-                 n_layers=1,
-                 is_recurrent=True
-                 ):
-        super(Actor, self).__init__()
-        self.recurrent = is_recurrent
-        self.layers = nn.ModuleList()
-        if n_layers == 1:
-            n_hidden = n_classes
-
-        for i in range(n_layers):
-            if i == 0 and self.recurrent:  # first layer, recurrent
-                self.layers.append(nn.LSTM(in_feats, n_hidden, batch_first=True))
-            elif i == 0:  # first layer, not recurrent
-                self.layers.append(nn.Linear(in_feats, n_hidden))
-            elif i != n_layers - 1:  # hidden layer
-                self.layers.append(nn.Linear(n_hidden, n_hidden))
-            else:  # last layer
-                self.layers.append(nn.Linear(n_hidden, n_classes))
-
-    def forward(self, state, hidden=None):
-        a, h = state, None
-        for i, layer in enumerate(self.layers):
-            if i == 0 and self.recurrent:
-                layer.flatten_parameters()
-                a, h = layer(a, hidden)
-            else:
-                a = F.relu(layer(a))
-        return a
-
-
-class Critic(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes=1,
-                 n_layers=1,
-                 is_recurrent=True
-                 ):
-        super(Critic, self).__init__()
-        self.recurrent = is_recurrent
-        self.layers = nn.ModuleList()
-        if n_layers == 1:
-            n_hidden = n_classes
-
-        for i in range(n_layers):
-            if i == 0 and self.recurrent:  # first layer, recurrent
-                self.layers.append(nn.LSTM(in_feats, n_hidden, batch_first=True))
-            elif i == 0:  # first layer, not recurrent
-                self.layers.append(nn.Linear(in_feats, n_hidden))
-            elif i != n_layers - 1:  # hidden layer
-                self.layers.append(nn.Linear(n_hidden, n_hidden))
-            else:  # last layer
-                self.layers.append(nn.Linear(n_hidden, n_classes))
-
-    def forward(self, state, hidden=None):
-        for i, layer in enumerate(self.layers):
-            if i == 0 and self.recurrent:
-                layer.flatten_parameters()
-                state, hidden = layer(state, hidden)
-            if i == len(self.layers) - 1:
-                state = F.relu(layer(state))
-            else:
-                state = F.relu(layer(state))
-        return state
 
 
 class DiscreteActorCritic:
@@ -105,25 +26,17 @@ class DiscreteActorCritic:
 
         # models
         self.model = GCN(self.in_feats, self.hid_feats, self.out_feats, n_layers=self.layers, activation=F.rrelu)
-        self.actor = Actor(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
-        self.critic = Critic(self.out_feats, n_hidden=self.out_feats, n_classes=1, n_layers=1, is_recurrent=False)
 
         if self._load_model:  # making model
             self.load_model()
         if self.cuda:
             self.model = self.model.cuda()
 
-        self.gcn_optimizer = torch.optim.Adam([
-            # {'params': self.actor.parameters(), "lr": 1e-4},
-            # {'params': self.critic.parameters(), "lr": 1e-4},
-            {'params': self.model.parameters(), "lr": self.learning_rate}
-        ])
+        self.gcn_optimizer = torch.optim.Adam([{
+            "params": self.model.parameters(),
+            "lr": self.learning_rate
+        }])
         self.lr_schedule = torch.optim.lr_scheduler.StepLR(self.gcn_optimizer, step_size=1, gamma=0.999)
-
-        self.ac_optimizer = torch.optim.Adam([
-            {'params': self.actor.parameters(), "lr": 1e-5},
-            {'params': self.critic.parameters(), "lr": 1e-5},
-        ])
 
     def print_actor_configuration(self):
         print("\tLoad model: {}".format(self._load_model),
@@ -147,18 +60,10 @@ class DiscreteActorCritic:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
             # convolve our graph
-            # costs = self.problem.costs
-            # betweennesses = self.problem.e_btwns
-            # weights = torch.cat((betweennesses, costs), dim=-1)
-            # [h, mN] = self.model(G, w=costs)
-            [h, mN] = self.model(G)
-            pi = self.actor(h)
-            val = self.critic(mN)
+            [pi, val] = self.model(G)
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
-
-            # print(action.item(), end=" ")
 
             # take action
             G, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs
@@ -206,28 +111,19 @@ class DiscreteActorCritic:
             action = probs.argmax()
         else:
             action = dist.sample()
-            # action = np.random.choice(np.arange(len(probs)), size=1, p=probs)[0]
-            # action = choice([dist.probs.argmax, dist.sample])()
         return action
 
     def update_model(self, PI, R, V):
-        # R = (R - R.mean()) / (R.std() + 1e-10) # batch normalization?
-        # V = (V - V.mean()) / (V.std() + 1e-10)
         self.gcn_optimizer.zero_grad()  # needed to update parameter correctly
-        self.ac_optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:
             R = R.cuda()
         A = (R.squeeze() - V.squeeze()).detach()
-        # A = (A - A.mean()) / (A.std() + 1e-10)
-        # A = R.squeeze() - V.squeeze().detach()
         L_policy = -(torch.log(PI) * A).mean()
         L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
         L_entropy = -(PI * PI.log()).mean()
         L = L_policy + L_value  # - 0.1 * L_entropy
-        # print(L.item())
         L.backward()
         self.gcn_optimizer.step()
-        # self.ac_optimizer.step()
         self.lr_schedule.step()
         self.logger.add_log('td_error', L_value.detach().item())
         self.logger.add_log('entropy', L_entropy.cpu().detach().item())
