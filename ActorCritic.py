@@ -2,7 +2,7 @@ from lightning_gym.GCN import GCN
 import torch
 import torch.nn.functional as F
 from lightning_gym.Logger import Logger
-
+import numpy as np
 
 class DiscreteActorCritic:
     def __init__(self, problem, config, **kwargs):
@@ -60,13 +60,18 @@ class DiscreteActorCritic:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
             # convolve our graph
+            # costs = np.array(self.problem.ig_g.es()["cost"])
+            # max_cost = np.max(costs)
+            # costs = costs/max_cost
+            # costs = torch.Tensor(costs).unsqueeze(-1)
+            # [pi, val] = self.model(G, w=costs)
             [pi, val] = self.model(G)
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
 
             # take action
-            G, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs
+            G, reward, done, _ = self.problem.step(action.item(), test=self._test)  # Take action and find outputs
             illegal_actions = self.problem.get_illegal_actions()
 
             # collect outputs of networks for learning - cat = appending for tensors
