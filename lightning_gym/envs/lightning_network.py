@@ -117,9 +117,10 @@ class NetworkEnvironment(Env):
         actions_taken = (self.node_vector == 1).nonzero()
         return sorted([self.index_to_node[index.item()] for index in actions_taken])
 
-    def step(self, action: int):
+    def step(self, action: int, test=False):
         """
         Update graph, node_vector, reward, and done using action
+        :param test: if test is true there is no need to calc betweenness until the budget is exhausted
         :param action: index representing node being connected to
         :return:
         """
@@ -136,11 +137,12 @@ class NetworkEnvironment(Env):
         else:
             self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
-            reward = self.get_reward()
+            if not test:
+                reward = self.get_reward()
 
         if self.num_actions == self.budget + self.budget_offset:  # check if budget has been exhausted
-            # self.get_reward()
-            # reward = self.btwn_cent
+            if test:
+                self.get_reward()
             done = True
         info = {}
         reward = torch.Tensor([reward])
