@@ -54,7 +54,7 @@ class RandomAgent:
             action = self.pick_random_action()
 
             # take action
-            _, reward, done, _ = self.problem.step(action.item())  # Take action and find outputs
+            _, _, done, _ = self.problem.step(action.item(), test=True)  # Take action and find outputs
 
         return self.problem.btwn_cent
 
