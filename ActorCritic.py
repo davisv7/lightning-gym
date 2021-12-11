@@ -21,7 +21,7 @@ class DiscreteActorCritic:
         self.out_feats = config.getint("agent", "out_features")
         self.gamma = config.getfloat("agent", "gamma")
         self.layers = config.getint("agent", "layers")
-        self.learning_rate = config.getfloat("agent", "learning_rate")
+        self.learning_rate = config.getfloat("agent", "learning_rate", fallback=1e3)
         self.num_episodes = 1
         self._test = kwargs.get("test", False)
         self.logger = Logger()
@@ -66,9 +66,9 @@ class DiscreteActorCritic:
             # max_cost = np.max(costs)
             # costs = 1-(costs / max_cost)
             # costs = torch.Tensor(costs).unsqueeze(-1)
-            # th_layer = torch.nn.Threshold(-0.99, 0)
+            # th_layer = torch.nn.Threshold(0.001, -1)
             # costs = th_layer(costs)
-            # costs = -costs+1
+            # costs = 1+costs
             # [pi, val] = self.model(G, w=costs)
             [pi, val] = self.model(G)
 
@@ -96,8 +96,8 @@ class DiscreteActorCritic:
         if not self._test:
             self.logger.add_log('tot_reward', self.problem.btwn_cent)
         # discount past rewards, rewards of the past are worth less
-        for i in reversed(range(0, R.shape[0]-1)):
-            R[i] = R[i] + self.gamma * R[i+1]
+        for i in reversed(range(0, R.shape[0] - 1)):
+            R[i] = R[i] + self.gamma * R[i + 1]
         return PI, R, V
 
     def predict_action(self, pi, illegal_actions):
