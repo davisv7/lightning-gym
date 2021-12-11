@@ -6,11 +6,10 @@ from dgl import readout_nodes
 class EGNNC(nn.Module):
     def __init__(self,
                  in_feats,
-                 n_hidden,
-                 n_classes,
+                 hid_feats,
+                 out_feats,
                  n_layers,
                  activation,
-                 dropout=0.10
                  ):
         """
         Edge Exploiting Graph Neural Network
@@ -23,15 +22,25 @@ class EGNNC(nn.Module):
         """
         super(EGNNC, self).__init__()
 
+        self.policy = nn.Linear(out_feats, 1)
+        self.value = nn.Linear(out_feats, 1)
+
         self.layers = nn.ModuleList()
-        # input layer
-        self.layers.append(EdgeGraphConv(in_feats, n_hidden, norm="left", activation=activation))
+        if n_layers == 1:
+            hid_feats = out_feats
+            activation = None
+
         # hidden layers
-        for i in range(n_layers - 2):
-            self.layers.append(EdgeGraphConv(n_hidden, n_hidden, norm="left", activation=activation))
-        # output layer
-        self.layers.append(EdgeGraphConv(n_hidden, n_classes, norm="left"))
-        self.dropout = nn.Dropout(p=dropout)
+        for i in range(n_layers):
+            if i == 0:
+                # input layer
+                self.layers.append(EdgeGraphConv(in_feats, hid_feats, norm="left", activation=activation))
+            elif i != n_layers - 1:
+                # hidden layer
+                self.layers.append(EdgeGraphConv(hid_feats, hid_feats, norm="left", activation=activation))
+            else:
+                # output layer
+                self.layers.append(EdgeGraphConv(hid_feats, out_feats, norm="left"))
 
     def forward(self, g, w):
         """
@@ -42,10 +51,10 @@ class EGNNC(nn.Module):
         """
         h = g.ndata['features']  # Get features from graph
         for i, layer in enumerate(self.layers):
-            # if i != len(self.layers)-1:
-            #     h = self.dropout(h)
             h = layer(g, h, edge_weight=w)  # Features after they been convoluted, these represent the nodes
         g.ndata['h'] = h
-        mN = readout_nodes(g, 'h', op="sum")  # column-wise average of those node features, this represents the graph
+        mN = readout_nodes(g, 'h', op="mean")  # column-wise average of those node features, this represents the graph
         g.ndata.pop('h')
-        return h, mN
+        PI = self.policy(h)
+        V = self.value(mN)
+        return PI, V

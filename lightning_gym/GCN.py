@@ -29,7 +29,7 @@ class GCN(nn.Module):
         """
         super(GCN, self).__init__()
         self.policy = nn.Linear(out_feats, 1)
-        self.value = nn.Linear(out_feats, 1, )
+        self.value = nn.Linear(out_feats, 1)
 
         self.layers = nn.ModuleList()
         if n_layers == 1:
@@ -48,15 +48,19 @@ class GCN(nn.Module):
                 # output layer
                 self.layers.append(GraphConv(hid_feats, out_feats, norm="left"))
 
-    def forward(self, g):
+    def forward(self, g, w=None):
         """
         Forward function defines how data is passed through the neural network.
+        :param w: tensor of edge weights
         :param g: graph itself (dgl graph)
         :return: h tensor of node out-features, mN the column-wise mean of these features
         """
         h = deepcopy(g.ndata['features'])  # Get features from graph
         for i, layer in enumerate(self.layers):
-            h = layer(g, h)  # Features after they been convoluted, these represent the nodes
+            if w is not None:
+                h = layer(g, h, edge_weight=w)
+            else:
+                h = layer(g, h)  # Features after they been convoluted, these represent the nodes
         g.ndata['h'] = h
         mN = readout_nodes(g, 'h', op="mean")  # column-wise average of those node features, this represents the graph
         PI = self.policy(h)
