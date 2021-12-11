@@ -20,16 +20,17 @@ def main():
     """
     config = configparser.ConfigParser()
     config.read("config.conf")
+    # config.read("scale_free.conf")
     print_config(config)
-    json_filename = config["env"]["filename"]
     seed = config["env"].getint("seed", fallback=None)
-    ds = config.getboolean("env", "down_sample")
 
     if seed:
         print("seed set")
         random_seed(seed)
 
     if config["env"]["graph_type"] == "snapshot":
+        json_filename = config["env"]["filename"]
+        ds = config.getboolean("env", "down_sample")
         nodes, edges = load_json(path.join(getcwd(), json_filename))
 
         # clean nodes
