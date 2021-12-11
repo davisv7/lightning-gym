@@ -19,8 +19,9 @@ def main():
     :return:
     """
     config = configparser.ConfigParser()
-    config.read("configs/config.conf")
-    # config.read("configs/scale_free.conf")
+    # config.read("configs/train_snapshot.conf")
+    config.read("configs/train_scale_free.conf")
+    # config.read("configs/test_snapshot.conf")
     print_config(config)
     seed = config["env"].getint("seed", fallback=None)
 
