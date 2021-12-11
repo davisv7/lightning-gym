@@ -1,8 +1,10 @@
 from lightning_gym.GCN import GCN
+from lightning_gym.EGNNC import EGNNC
 import torch
 import torch.nn.functional as F
 from lightning_gym.Logger import Logger
 import numpy as np
+
 
 class DiscreteActorCritic:
     def __init__(self, problem, config, **kwargs):
@@ -62,8 +64,11 @@ class DiscreteActorCritic:
             # convolve our graph
             # costs = np.array(self.problem.ig_g.es()["cost"])
             # max_cost = np.max(costs)
-            # costs = costs/max_cost
+            # costs = 1-(costs / max_cost)
             # costs = torch.Tensor(costs).unsqueeze(-1)
+            # th_layer = torch.nn.Threshold(-0.99, 0)
+            # costs = th_layer(costs)
+            # costs = -costs+1
             # [pi, val] = self.model(G, w=costs)
             [pi, val] = self.model(G)
 
