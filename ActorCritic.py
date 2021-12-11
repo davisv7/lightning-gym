@@ -96,8 +96,8 @@ class DiscreteActorCritic:
         if not self._test:
             self.logger.add_log('tot_reward', self.problem.btwn_cent)
         # discount past rewards, rewards of the past are worth less
-        for i in range(R.shape[0] - 1):
-            R[-2 - i] = R[-2 - i] + self.gamma * R[-1 - i]
+        for i in reversed(range(0, R.shape[0]-1)):
+            R[i] = R[i] + self.gamma * R[i+1]
         return PI, R, V
 
     def predict_action(self, pi, illegal_actions):
