@@ -22,7 +22,7 @@ class NetworkEnvironment(Env):
         self.node_id = config.get("env", "node_id")
         self.repeat = config.getboolean("env", "repeat")
         self.graph_type = config.get("env", "graph_type")
-        self.filename = config.get("env", "filename")
+        self.filename = config.get("env", "filename", fallback=None)
         self.cutoff = config.getint("env", "cutoff")
         self.n = config.getint("env", "n", fallback=None)
         self.config = config
