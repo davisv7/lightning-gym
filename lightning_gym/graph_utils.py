@@ -60,21 +60,22 @@ def nx_to_ig(nx_graph, add_self_loop=True):
     edge_list = []
     costs = []
 
+    # add vertices to igraph
     for node in nx_graph.nodes():
         ig_g.add_vertex(name=node)
-        if add_self_loop:
-            edge_list.append((node, node))
-            costs.append(1e9)
 
+    # add normal edges to igraph
     for u, v in nx_graph.edges():
         c1 = float(nx_graph[u][v].get('cost', 0.1))
         edge_list.append((u, v))
         costs.append(c1)
-    # max_cost = max(costs)
-    # if add_self_loop:
-    #     for node in nx_graph.nodes():
-    #         edge_list.append((node, node))
-    #         costs.append(2*max_cost)
+
+    # add self loops (if applicable)
+    if add_self_loop:
+        max_cost = max(costs)
+        for node in nx_graph.nodes():
+            edge_list.append((node, node))
+            costs.append(2 * max_cost)  # keeps these self loops from affecting betweenness algorithm
     ig_g.add_edges(edge_list, {'cost': costs})
     return ig_g
 
