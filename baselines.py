@@ -2,7 +2,41 @@ import numpy as np
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 
 
-class ErsoyAgent:
+class TopKAgent:
+    def __init__(self, problem: NetworkEnvironment):
+        self.problem = problem  # environment
+        self.computed = False  # flag indicating whether betweennesses have been calculated
+        self.action_to_btwn = None
+
+    def run_episode(self):  # similar to epochs
+        done = False
+        _ = self.problem.reset()  # We get our initial state by resetting
+
+        while not done:  # While we haven't exceeded budget
+            # Get action from policy network
+            action = self.pick_topk_action()
+
+            # take action
+            _, reward, done, _ = self.problem.step(action, test=True)  # Take action and find outputs
+
+        return self.problem.btwn_cent
+
+    def compute_betweenness(self):
+        betweennesses = self.problem.ig_g.betweenness(directed=True, weights="cost")
+        names = self.problem.ig_g.vs()["name"]
+        actions = [self.problem.index_to_node.inverse[name] for name in names]
+        self.action_to_btwn = dict(zip(actions, betweennesses))
+        self.computed = True
+
+    def pick_topk_action(self):
+        if not self.computed:
+            self.compute_betweenness()
+        legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
+        best_action = max(legal_actions, key=lambda x: self.action_to_btwn[x])
+        return best_action
+
+
+class GreedyAgent:
     def __init__(self, problem: NetworkEnvironment):
         self.problem = problem  # environment
 
