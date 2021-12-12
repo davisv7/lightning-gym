@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from lightning_gym.Logger import Logger
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 
 class DiscreteActorCritic:
@@ -55,6 +56,7 @@ class DiscreteActorCritic:
         R = torch.empty(0)  # reward
         V = torch.empty(0)  # value network
         old_state = None
+        scaler = MinMaxScaler()
 
         while not done:  # While we haven't exceeded budget
             # Use this if we have an NVIDIA graphics card (we don't)
@@ -63,8 +65,9 @@ class DiscreteActorCritic:
 
             # convolve our graph
             # costs = np.array(self.problem.ig_g.es()["cost"])
+            # costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
             # max_cost = np.max(costs)
-            # costs = 1-(costs / max_cost)
+            # costs = 1 - costs
             # costs = torch.Tensor(costs).unsqueeze(-1)
             # th_layer = torch.nn.Threshold(0.001, -1)
             # costs = th_layer(costs)
