@@ -1,13 +1,12 @@
 from ln_graph_utils.ln_graph_utils import *
 import os.path as path
 from os import getcwd
-from lightning_gym.utils import print_config
+from lightning_gym.utils import print_config,random_seed
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 from ActorCritic import DiscreteActorCritic
 import configparser
-from lightning_gym.utils import random_seed
 from lightning_gym.graph_utils import undirected, down_sample
-from baselines import RandomAgent, ErsoyAgent
+from baselines import *
 
 
 def main():
@@ -70,7 +69,8 @@ def main():
     # env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
     rando = RandomAgent(env)
-    soy = ErsoyAgent(env)
+    greed = GreedyAgent(env)
+    topk = TopKAgent(env)
 
     num_episodes = config.getint("training", "episodes")
     for episode in range(num_episodes):
@@ -82,7 +82,8 @@ def main():
     ajay._test = True
     print("Test Results:", ajay.test())
     print("Random Results:", rando.run_episode())
-    print("Esroy Results:", soy.run_episode())
+    print("TopK Results:", topk.run_episode())
+    print("Greed Results:", greed.run_episode())
     print('total reward: ', ajay.logger.log['tot_reward'])
     print("td error: ", ajay.logger.log['td_error'])
     print("entropy: ", ajay.logger.log['entropy'])
