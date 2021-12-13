@@ -1,14 +1,16 @@
 from lightning_gym.GCN import GCN
 from lightning_gym.EGNNC import EGNNC
+from lightning_gym.SAGE import SAGE
 import torch
 import torch.nn.functional as F
 from lightning_gym.Logger import Logger
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+from lightning_gym.envs.lightning_network import NetworkEnvironment
 
 
 class DiscreteActorCritic:
-    def __init__(self, problem, config, **kwargs):
+    def __init__(self, problem: NetworkEnvironment, config, **kwargs):
 
         self.problem = problem  # environment
         self.path = config.get("agent", "model_file")
@@ -66,12 +68,11 @@ class DiscreteActorCritic:
             # convolve our graph
             # costs = np.array(self.problem.ig_g.es()["cost"])
             # costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
-            # max_cost = np.max(costs)
             # costs = 1 - costs
             # costs = torch.Tensor(costs).unsqueeze(-1)
-            # th_layer = torch.nn.Threshold(0.001, -1)
+            # th_layer = torch.nn.Threshold(-0.001, 1)
             # costs = th_layer(costs)
-            # costs = 1+costs
+            # costs = 1 + costs
             # [pi, val] = self.model(G, w=costs)
             [pi, val] = self.model(G)
 
