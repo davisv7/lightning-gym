@@ -26,7 +26,7 @@ class DiscreteActorCritic:
         self.layers = config.getint("agent", "layers")
         self.learning_rate = config.getfloat("agent", "learning_rate", fallback=1e3)
         self.num_episodes = 1
-        self._test = kwargs.get("test", False)
+        self._no_calc = kwargs.get("test", False)
         self.logger = Logger()
 
         # models
@@ -80,7 +80,7 @@ class DiscreteActorCritic:
             action = self.predict_action(pi, illegal_actions)
 
             # take action
-            G, reward, done, _ = self.problem.step(action.item(), test=self._test)  # Take action and find outputs
+            G, reward, done, _ = self.problem.step(action.item(), no_calc=self._no_calc)  # Take action and find outputs
             illegal_actions = self.problem.get_illegal_actions()
 
             # collect outputs of networks for learning - cat = appending for tensors
@@ -97,7 +97,7 @@ class DiscreteActorCritic:
             #     sars = [old_state, action.unsqueeze(-1), reward, mN]
             #     self.memory_replay_buffer.push(*sars)
             #     old_state = mN
-        if not self._test:
+        if not self._no_calc:
             self.logger.add_log('tot_reward', self.problem.btwn_cent)
         # discount past rewards, rewards of the past are worth less
         for i in reversed(range(0, R.shape[0] - 1)):
@@ -121,7 +121,7 @@ class DiscreteActorCritic:
         # Take the higher probability
         probs = dist.probs.detach().numpy()
         # probs = probs / sum(probs)
-        if self._test:
+        if self._no_calc:
             action = probs.argmax()
         else:
             action = dist.sample()
@@ -174,7 +174,9 @@ class DiscreteActorCritic:
         return self.logger
 
     def test(self):
+        self._no_calc = True
         [_, _, _] = self.run_episode()
+        self.problem.get_reward()
         return self.problem.btwn_cent
 
     def save_model(self):  # takes what we learned
