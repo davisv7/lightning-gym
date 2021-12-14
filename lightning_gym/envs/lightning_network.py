@@ -119,10 +119,10 @@ class NetworkEnvironment(Env):
         actions_taken = (self.node_vector == 1).nonzero()
         return sorted([self.index_to_node[index.item()] for index in actions_taken])
 
-    def step(self, action: int, test=False):
+    def step(self, action: int, no_calc=False):
         """
         Update graph, node_vector, reward, and done using action
-        :param test: if test is true there is no need to calc betweenness until the budget is exhausted
+        :param no_calc: if test is true there is no need to calc betweenness until the budget is exhausted
         :param action: index representing node being connected to
         :return:
         """
@@ -135,16 +135,15 @@ class NetworkEnvironment(Env):
             '''
             self.node_vector[action] = 0  # mark channel for deletion
             self.take_action(action, remove=True)
-            reward = self.get_reward()
+            if not no_calc:
+                reward = self.get_reward()
         else:
             self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
-            if not test:
+            if not no_calc:
                 reward = self.get_reward()
 
         if self.num_actions == self.budget + self.budget_offset:  # check if budget has been exhausted
-            if test:
-                self.get_reward()
             done = True
         info = {}
         reward = torch.Tensor([reward])
@@ -190,6 +189,7 @@ class NetworkEnvironment(Env):
                 self.add_node("")
         elif self.graph_type == 'scale_free':
             self.nx_graph = random_scale_free(self.n)
+            # print(len(self.nx_graph.nodes()), len(self.nx_graph.edges()))
             self.add_node(self.n)
 
         # Create bidictionary = tuple index: pubKey
@@ -265,7 +265,7 @@ class NetworkEnvironment(Env):
             norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
             norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
 
-            eigenness = np.array(self.ig_g.eigenvector_centrality(directed=True, scale=True,weights="cost"))
+            eigenness = np.array(self.ig_g.eigenvector_centrality(directed=True, scale=True, weights="cost"))
             eigenness[-1] = 0
             norm_eigenness = scaler.fit_transform(eigenness.reshape(-1, 1)).squeeze()
             norm_eigenness = torch.Tensor(norm_eigenness).unsqueeze(-1)
