@@ -3,9 +3,10 @@ from lightning_gym.envs.lightning_network import NetworkEnvironment
 import torch
 import torch.nn.functional as F
 from lightning_gym.GCN import GCN
+from sklearn.preprocessing import MinMaxScaler
 
 
-class TopKAgent:
+class TopBtwnAgent:
     def __init__(self, problem: NetworkEnvironment):
         self.problem = problem  # environment
         self.computed = False  # flag indicating whether betweennesses have been calculated
@@ -25,7 +26,9 @@ class TopKAgent:
         return self.problem.btwn_cent
 
     def compute_betweenness(self):
-        betweennesses = self.problem.ig_g.betweenness(directed=True, weights="cost", cutoff=20)
+        # cost = None
+        cost = "cost"
+        betweennesses = self.problem.ig_g.betweenness(directed=True, weights=cost, cutoff=20)
         names = self.problem.ig_g.vs()["name"]
         actions = [self.problem.index_to_node.inverse[name] for name in names]
         self.action_to_btwn = dict(zip(actions, betweennesses))
@@ -134,13 +137,23 @@ class TrainedGreedyAgent:
         illegal_actions = self.problem.get_illegal_actions().squeeze().detach().numpy()
         best_action = None
         n = 5
-        [pi, _] = self.model(G)
+        scaler = MinMaxScaler()
+
+        costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
+        costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
+        # costs = 1 - costs
+        costs = torch.Tensor(costs).unsqueeze(-1)
+        # th_layer = torch.nn.Threshold(-0.001, 1)
+        # costs = th_layer(costs)
+        # costs = 1 + costs
+        [pi, _] = self.model(G, w=costs)
+        # [pi, _] = self.model(G)
         if self.problem.num_actions + self.problem.budget_offset < 2:
             best_action = self.predict_action(pi, illegal_actions, 1).item()
         else:
-            best_reward = 0
-            for action in self.predict_action(pi, illegal_actions, n):
-                a = action.item()
+            best_reward = -1
+            predicted_actions = list(set(map(lambda x: x.item(), self.predict_action(pi, illegal_actions, n))))
+            for a in predicted_actions:
                 _, reward, _, _ = self.problem.step(a)
                 reward = reward.item()
                 if reward > best_reward:
@@ -165,3 +178,35 @@ class TrainedGreedyAgent:
             return probs.argmax()  # take the most likely action
         else:
             return dist.sample((n,))  # sample n actions
+
+
+class TopDegreeAgent:
+    def __init__(self, problem: NetworkEnvironment):
+        self.problem = problem  # environment
+        self.computed = False  # flag indicating whether betweennesses have been calculated
+        self.action_to_btwn = None
+
+    def run_episode(self):  # similar to epochs
+        done = False
+        _ = self.problem.reset()  # We get our initial state by resetting
+
+        while not done:  # While we haven't exceeded budget
+            # Get action from policy network
+            action = self.pick_topk_action()
+
+            # take action
+            _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
+        self.problem.get_reward()
+        return self.problem.btwn_cent
+
+    def compute_degrees(self):
+        betweennesses = self.problem.ig_g.degree()
+        names = self.problem.ig_g.vs()["name"]
+        actions = [self.problem.index_to_node.inverse[name] for name in names]
+        self.action_to_btwn = dict(zip(actions, betweennesses))
+
+    def pick_topk_action(self):
+        self.compute_degrees()
+        legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
+        best_action = max(legal_actions, key=lambda x: self.action_to_btwn[x])
+        return best_action

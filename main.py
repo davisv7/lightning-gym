@@ -19,8 +19,9 @@ def main():
     """
     config = configparser.ConfigParser()
     # config.read("configs/train_snapshot.conf")
-    config.read("configs/train_scale_free.conf")
-    # config.read("configs/test_snapshot.conf")
+    # config.read("configs/train_scale_free.conf")
+    config.read("configs/test_snapshot.conf")
+    # config.read("configs/test_scale_free.conf")
     print_config(config)
     seed = config["env"].getint("seed", fallback=None)
 
@@ -69,10 +70,11 @@ def main():
 
     # env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
-    rando = RandomAgent(env)
-    greed = GreedyAgent(env)
-    topk = TopKAgent(env)
-    trained = TrainedGreedyAgent(env, config)
+    # rando = RandomAgent(env)
+    # topk_btwn = TopBtwnAgent(env)
+    # topk_degree = TopDegreeAgent(env)
+    # greed = GreedyAgent(env)
+    # trained = TrainedGreedyAgent(env, config)
 
     num_episodes = config.getint("training", "episodes")
     for episode in range(num_episodes):
@@ -81,17 +83,22 @@ def main():
         print("E: {}, R: {:.4f}, N:{}".format(episode, env.btwn_cent, recommendations))
     ajay.save_model()
 
-    ajay._test = True
+    # ajay._no_calc = True
     print("Test Results:", ajay.test())
-    print(ajay.problem.get_recommendations())
+    # print(ajay.problem.get_closeness())
+    # print(ajay.problem.get_recommendations())
     # print([key_to_alias[key] for key in ajay.problem.get_recommendations()])
-    print("Random Results:", max([rando.run_episode() for _ in range(1)]))
-    print("TopK Results:", topk.run_episode())
-    # print("Trained Greedy Results:", trained.run_episode())
-    # print("Greed Results:", greed.run_episode())
-    print('total reward: ', ajay.logger.log['tot_reward'])
-    print("td error: ", ajay.logger.log['td_error'])
-    print("entropy: ", ajay.logger.log['entropy'])
+    # # print("Random Results:", rando.run_episode())
+    # print("TopK Results:", topk_btwn.run_episode())
+    # print(topk_btwn.problem.get_closeness())
+    # print(topk_btwn.problem.get_recommendations())
+    # print([key_to_alias[key] for key in topk_btwn.problem.get_recommendations()])
+    # print("TopK Degree Results:", topk_degree.run_episode())
+    # # print("Trained Greedy Results:", trained.run_episode())
+    # # print("Greed Results:", greed.run_episode())
+    # print('total reward: ', ajay.logger.log['tot_reward'])
+    # print("td error: ", ajay.logger.log['td_error'])
+    # print("entropy: ", ajay.logger.log['entropy'])
     # ajay.logger.plot_reward()
     # ajay.logger.plot_td_error()
 

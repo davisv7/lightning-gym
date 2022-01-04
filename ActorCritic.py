@@ -66,15 +66,15 @@ class DiscreteActorCritic:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
             # convolve our graph
-            # costs = np.array(self.problem.ig_g.es()["cost"])
-            # costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
-            # costs = 1 - costs
-            # costs = torch.Tensor(costs).unsqueeze(-1)
-            # th_layer = torch.nn.Threshold(-0.001, 1)
-            # costs = th_layer(costs)
+            costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
+            costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
+            # # costs = 1 - costs
+            costs = torch.Tensor(costs).unsqueeze(-1)
+            # # th_layer = torch.nn.Threshold(-0.001, 1)
+            # # costs = th_layer(costs)
             # costs = 1 + costs
-            # [pi, val] = self.model(G, w=costs)
-            [pi, val] = self.model(G)
+            [pi, val] = self.model(G, w=costs)
+            # [pi, val] = self.model(G)
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
