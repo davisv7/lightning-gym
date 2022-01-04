@@ -29,7 +29,7 @@ from dgl import readout_nodes
 #
 #     def forward(self, g):
 #         g,h = g,g.ndata["features"]
-#         # g.edata["e"] = g.edata["weight"]
+#         # g.edata["e"] = g.edata["cost"]
 #
 #         # Dropout before the GAT layer is used to avoid overfitting in small datasets like Cora.
 #         # One can skip them if the dataset is sufficiently large.
