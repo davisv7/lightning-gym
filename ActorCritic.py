@@ -1,14 +1,16 @@
 from lightning_gym.GCN import GCN
 from lightning_gym.EGNNC import EGNNC
+from lightning_gym.SAGE import SAGE
 import torch
 import torch.nn.functional as F
 from lightning_gym.Logger import Logger
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+from lightning_gym.envs.lightning_network import NetworkEnvironment
 
 
 class DiscreteActorCritic:
-    def __init__(self, problem, config, **kwargs):
+    def __init__(self, problem: NetworkEnvironment, config, **kwargs):
 
         self.problem = problem  # environment
         self.path = config.get("agent", "model_file")
@@ -24,7 +26,7 @@ class DiscreteActorCritic:
         self.layers = config.getint("agent", "layers")
         self.learning_rate = config.getfloat("agent", "learning_rate", fallback=1e3)
         self.num_episodes = 1
-        self._test = kwargs.get("test", False)
+        self._no_calc = kwargs.get("test", False)
         self.logger = Logger()
 
         # models
@@ -64,22 +66,21 @@ class DiscreteActorCritic:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
             # convolve our graph
-            # costs = np.array(self.problem.ig_g.es()["cost"])
-            # costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
-            # max_cost = np.max(costs)
-            # costs = 1 - costs
-            # costs = torch.Tensor(costs).unsqueeze(-1)
-            # th_layer = torch.nn.Threshold(0.001, -1)
-            # costs = th_layer(costs)
-            # costs = 1+costs
-            # [pi, val] = self.model(G, w=costs)
-            [pi, val] = self.model(G)
+            costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
+            costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
+            # # costs = 1 - costs
+            costs = torch.Tensor(costs).unsqueeze(-1)
+            # # th_layer = torch.nn.Threshold(-0.001, 1)
+            # # costs = th_layer(costs)
+            # costs = 1 + costs
+            [pi, val] = self.model(G, w=costs)
+            # [pi, val] = self.model(G)
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)
 
             # take action
-            G, reward, done, _ = self.problem.step(action.item(), test=self._test)  # Take action and find outputs
+            G, reward, done, _ = self.problem.step(action.item(), no_calc=self._no_calc)  # Take action and find outputs
             illegal_actions = self.problem.get_illegal_actions()
 
             # collect outputs of networks for learning - cat = appending for tensors
@@ -96,7 +97,7 @@ class DiscreteActorCritic:
             #     sars = [old_state, action.unsqueeze(-1), reward, mN]
             #     self.memory_replay_buffer.push(*sars)
             #     old_state = mN
-        if not self._test:
+        if not self._no_calc:
             self.logger.add_log('tot_reward', self.problem.btwn_cent)
         # discount past rewards, rewards of the past are worth less
         for i in reversed(range(0, R.shape[0] - 1)):
@@ -120,7 +121,7 @@ class DiscreteActorCritic:
         # Take the higher probability
         probs = dist.probs.detach().numpy()
         # probs = probs / sum(probs)
-        if self._test:
+        if self._no_calc:
             action = probs.argmax()
         else:
             action = dist.sample()
@@ -173,7 +174,9 @@ class DiscreteActorCritic:
         return self.logger
 
     def test(self):
+        self._no_calc = True
         [_, _, _] = self.run_episode()
+        self.problem.get_reward()
         return self.problem.btwn_cent
 
     def save_model(self):  # takes what we learned

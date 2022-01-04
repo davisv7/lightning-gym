@@ -1,7 +1,7 @@
 from ln_graph_utils.ln_graph_utils import *
 import os.path as path
 from os import getcwd
-from lightning_gym.utils import print_config,random_seed
+from lightning_gym.utils import print_config, random_seed
 from lightning_gym.envs.lightning_network import NetworkEnvironment
 from ActorCritic import DiscreteActorCritic
 import configparser
@@ -19,8 +19,9 @@ def main():
     """
     config = configparser.ConfigParser()
     # config.read("configs/train_snapshot.conf")
-    config.read("configs/train_scale_free.conf")
-    # config.read("configs/test_snapshot.conf")
+    # config.read("configs/train_scale_free.conf")
+    config.read("configs/test_snapshot.conf")
+    # config.read("configs/test_scale_free.conf")
     print_config(config)
     seed = config["env"].getint("seed", fallback=None)
 
@@ -31,7 +32,8 @@ def main():
     if config["env"]["graph_type"] == "snapshot":
         json_filename = config["env"]["filename"]
         ds = config.getboolean("env", "down_sample")
-        nodes, edges = load_json(path.join(getcwd(), json_filename))
+        nodes, edges = load_json(path.join(getcwd(), "snapshots", json_filename))
+        key_to_alias = dict({x["pub_key"]: x["alias"] for x in nodes})
 
         # clean nodes
         active_nodes = get_pubkeys(nodes)
@@ -68,25 +70,35 @@ def main():
 
     # env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
-    rando = RandomAgent(env)
-    greed = GreedyAgent(env)
-    topk = TopKAgent(env)
+    # rando = RandomAgent(env)
+    # topk_btwn = TopBtwnAgent(env)
+    # topk_degree = TopDegreeAgent(env)
+    # greed = GreedyAgent(env)
+    # trained = TrainedGreedyAgent(env, config)
 
     num_episodes = config.getint("training", "episodes")
     for episode in range(num_episodes):
         log = ajay.train()
         recommendations = env.get_recommendations()
-        print("E: {}, R: {:.4f}, N:{}".format(episode, log.log['tot_reward'][-1], recommendations))
+        print("E: {}, R: {:.4f}, N:{}".format(episode, env.btwn_cent, recommendations))
     ajay.save_model()
 
-    ajay._test = True
+    # ajay._no_calc = True
     print("Test Results:", ajay.test())
-    print("Random Results:", rando.run_episode())
-    print("TopK Results:", topk.run_episode())
-    print("Greed Results:", greed.run_episode())
-    print('total reward: ', ajay.logger.log['tot_reward'])
-    print("td error: ", ajay.logger.log['td_error'])
-    print("entropy: ", ajay.logger.log['entropy'])
+    # print(ajay.problem.get_closeness())
+    # print(ajay.problem.get_recommendations())
+    # print([key_to_alias[key] for key in ajay.problem.get_recommendations()])
+    # # print("Random Results:", rando.run_episode())
+    # print("TopK Results:", topk_btwn.run_episode())
+    # print(topk_btwn.problem.get_closeness())
+    # print(topk_btwn.problem.get_recommendations())
+    # print([key_to_alias[key] for key in topk_btwn.problem.get_recommendations()])
+    # print("TopK Degree Results:", topk_degree.run_episode())
+    # # print("Trained Greedy Results:", trained.run_episode())
+    # # print("Greed Results:", greed.run_episode())
+    # print('total reward: ', ajay.logger.log['tot_reward'])
+    # print("td error: ", ajay.logger.log['td_error'])
+    # print("entropy: ", ajay.logger.log['entropy'])
     # ajay.logger.plot_reward()
     # ajay.logger.plot_td_error()
 

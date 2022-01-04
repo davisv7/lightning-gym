@@ -93,6 +93,7 @@ class NetworkEnvironment(Env):
         :return:
         """
         weights = "cost"
+        # weights = None
         if self.repeat:
             key = "".join(list(map(str, self.get_recommendations())))
             if key in self.reward_dict:
@@ -109,7 +110,7 @@ class NetworkEnvironment(Env):
         # return self.btwn_cent
 
     def get_closeness(self):
-        return self.ig_g.closeness(self.node_id, mode="out", weights="cost") / self.norm
+        return self.ig_g.closeness(self.node_id, mode="in", weights="cost")
 
     def get_recommendations(self):
         """
@@ -119,10 +120,10 @@ class NetworkEnvironment(Env):
         actions_taken = (self.node_vector == 1).nonzero()
         return sorted([self.index_to_node[index.item()] for index in actions_taken])
 
-    def step(self, action: int, test=False):
+    def step(self, action: int, no_calc=False):
         """
         Update graph, node_vector, reward, and done using action
-        :param test: if test is true there is no need to calc betweenness until the budget is exhausted
+        :param no_calc: if test is true there is no need to calc betweenness until the budget is exhausted
         :param action: index representing node being connected to
         :return:
         """
@@ -135,16 +136,15 @@ class NetworkEnvironment(Env):
             '''
             self.node_vector[action] = 0  # mark channel for deletion
             self.take_action(action, remove=True)
-            reward = self.get_reward()
+            if not no_calc:
+                reward = self.get_reward()
         else:
             self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
-            if not test:
+            if not no_calc:
                 reward = self.get_reward()
 
         if self.num_actions == self.budget + self.budget_offset:  # check if budget has been exhausted
-            if test:
-                self.get_reward()
             done = True
         info = {}
         reward = torch.Tensor([reward])
@@ -190,6 +190,7 @@ class NetworkEnvironment(Env):
                 self.add_node("")
         elif self.graph_type == 'scale_free':
             self.nx_graph = random_scale_free(self.n)
+            # print(len(self.nx_graph.nodes()), len(self.nx_graph.edges()))
             self.add_node(self.n)
 
         # Create bidictionary = tuple index: pubKey
@@ -256,19 +257,19 @@ class NetworkEnvironment(Env):
         :return:
         """
         scaler = MinMaxScaler()
-        # possible predictors: degree,betweenness,closeness,inclusion
+        # possible predictors: degree,betweenness,eigenness,closeness,inclusion
         if self.node_features is not None and self.repeat:
             j = torch.arange(self.node_features.size(0)).long()
             self.node_features[j, -1] = self.node_vector
         else:
-            degrees = np.array(self.ig_g.strength(mode="in"))
-            norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
-            norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
+            # degrees = np.array(self.ig_g.strength(mode="in"))
+            # norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
+            # norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
 
-            eigenness = np.array(self.ig_g.eigenvector_centrality(directed=True, scale=True,weights="cost"))
-            eigenness[-1] = 0
-            norm_eigenness = scaler.fit_transform(eigenness.reshape(-1, 1)).squeeze()
-            norm_eigenness = torch.Tensor(norm_eigenness).unsqueeze(-1)
+            # eigenness = np.array(self.ig_g.eigenvector_centrality(directed=True, scale=True, weights="cost"))
+            # eigenness[-1] = 0
+            # norm_eigenness = scaler.fit_transform(eigenness.reshape(-1, 1)).squeeze()
+            # norm_eigenness = torch.Tensor(norm_eigenness).unsqueeze(-1)
 
             # closeness = np.array(self.ig_g.closeness(mode="out", weights="cost"))
             # closeness[-1] = 0
@@ -280,14 +281,14 @@ class NetworkEnvironment(Env):
             # norm_betweenness = 1 - (scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze())
             # norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
 
-            self.node_features = torch.cat((
-                norm_degrees,
-                # norm_closeness,
-                # norm_betweenness,
-                norm_eigenness,
-                self.node_vector.unsqueeze(-1)
-            ), dim=1)
-            # self.node_features = self.node_vector.unsqueeze(-1)
+            # self.node_features = torch.cat((
+            # norm_degrees,
+            # norm_closeness,
+            # norm_betweenness,
+            # norm_eigenness,
+            # self.node_vector.unsqueeze(-1)
+            # ), dim=1)
+            self.node_features = self.node_vector.unsqueeze(-1)
 
         self.dgl_g.ndata['features'] = self.node_features
 
