@@ -10,12 +10,13 @@ warnings.filterwarnings("ignore")
 
 def train_upwards(config):
     entire_log = Logger()
-    start = 9
-    end = start + 2
+    start = 4
+    end = start + 5
     num_episodes = 100
     for power in range(start, end):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
-        env = NetworkEnvironment(config, k=k)
+        config["env"]["n"] = str(k)
+        env = NetworkEnvironment(config)
         env.r_logger = entire_log
         ajay = DiscreteActorCritic(env, config)  # Awaken Ajay the Agent
 
@@ -24,19 +25,18 @@ def train_upwards(config):
             recommendations = env.get_recommendations()
             print("E: {}, S: {}, R: {:.4f}, N:{}".format(episode, k, log.log['tot_reward'][-1], recommendations))
         entire_log = log
-        ajay._load_model = True
+        config["agent"]["load_model"] = "True"
         ajay.save_model()  # Save model to reuse and continue to improve on it
         print()
 
     print('total reward: ', env.r_logger.log['tot_reward'])
     print("td error: ", env.r_logger.log['td_error'])
     print("entropy: ", env.r_logger.log['entropy'])
-    env.r_logger.plot_logger()
+    env.r_logger.plot_reward()
 
 
 def before_after(k=1000, load_model=True):
-    env = NetworkEnvironment(config, k=k)
-
+    env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
     env.reset()
     plot_apsp(env.nx_graph)
@@ -54,7 +54,7 @@ def print_config(config):
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()
-    print(config.read("config.conf"))
+    print(config.read("./configs/train_scale_free.conf"))
     print_config(config)
     train_upwards(config)
     # before_after()
