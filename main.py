@@ -7,6 +7,45 @@ from ActorCritic import DiscreteActorCritic
 import configparser
 from lightning_gym.graph_utils import undirected, down_sample
 from baselines import *
+import argparse
+
+
+def create_snapshot_env(config):
+    json_filename = config["env"]["filename"]
+    ds = config.getboolean("env", "down_sample")
+    nodes, edges = load_json(path.join(getcwd(), "snapshots", json_filename))
+    key_to_alias = dict({x["pub_key"]: x["alias"] for x in nodes})
+
+    # clean nodes
+    active_nodes = get_pubkeys(nodes)
+
+    # clean edges
+    edge_filters = config["edge_filters"]
+    active_edges = clean_edges(edges, edge_filters)
+    active_edges = get_channels_with_attrs(active_edges)
+
+    # Create graph
+    g = nx.MultiDiGraph()
+    g.add_edges_from(active_edges)
+    g = nx.MultiDiGraph(g.subgraph(active_nodes))
+    if ds:
+        g = down_sample(g, config)
+
+    # reduce graph
+    graph_filters = config["graph_filters"]
+    if graph_filters.getboolean("combine_multiedges"):
+        g = simplify_graph(g)
+    if graph_filters.getboolean("remove_bridges"):
+        g = nx.DiGraph(reduce_to_mainnet(g))
+    if graph_filters.getboolean("undirected"):
+        g = undirected(g)
+    if graph_filters.getboolean("unweighted"):
+        nx.set_edge_attributes(g, values=0.1, name='cost')
+
+    print(len(g.nodes()), len(g.edges()))
+
+    # create an environment, an agent, and then train for some number of episodes
+    return NetworkEnvironment(config, g=g), key_to_alias
 
 
 def main():
@@ -17,54 +56,25 @@ def main():
     A smaller directory is created that contains a sample of 100 of the clean snapshots to be used to train the agent.
     :return:
     """
+    parser = argparse.ArgumentParser(description='Run  a simulation according to config.')
+    # parser.add_argument("--config", type=str, default="configs/train_snapshot.conf")
+    parser.add_argument("--config", type=str, default="./configs/train_scale_free.conf")
+    # parser.add_argument("--config", type=str, default="configs/test_snapshot.conf")
+    # parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
+    args = parser.parse_args()
+    config_loc = args.config
+
     config = configparser.ConfigParser()
-    # config.read("configs/train_snapshot.conf")
-    # config.read("configs/train_scale_free.conf")
-    config.read("configs/test_snapshot.conf")
-    # config.read("configs/test_scale_free.conf")
+    config.read(config_loc)
     print_config(config)
     seed = config["env"].getint("seed", fallback=None)
 
     if seed:
-        print("seed set")
         random_seed(seed)
+        print("seed set")
 
     if config["env"]["graph_type"] == "snapshot":
-        json_filename = config["env"]["filename"]
-        ds = config.getboolean("env", "down_sample")
-        nodes, edges = load_json(path.join(getcwd(), "snapshots", json_filename))
-        key_to_alias = dict({x["pub_key"]: x["alias"] for x in nodes})
-
-        # clean nodes
-        active_nodes = get_pubkeys(nodes)
-
-        # clean edges
-        edge_filters = config["edge_filters"]
-        active_edges = clean_edges(edges, edge_filters)
-        active_edges = get_channels_with_attrs(active_edges)
-
-        # Create graph
-        g = nx.MultiDiGraph()
-        g.add_edges_from(active_edges)
-        g = nx.MultiDiGraph(g.subgraph(active_nodes))
-        if ds:
-            g = down_sample(g, config)
-
-        # reduce graph
-        graph_filters = config["graph_filters"]
-        if graph_filters.getboolean("combine_multiedges"):
-            g = simplify_graph(g)
-        if graph_filters.getboolean("remove_bridges"):
-            g = nx.DiGraph(reduce_to_mainnet(g))
-        if graph_filters.getboolean("undirected"):
-            g = undirected(g)
-        if graph_filters.getboolean("unweighted"):
-            nx.set_edge_attributes(g, values=0.1, name='cost')
-
-        print(len(g.nodes()), len(g.edges()))
-
-        # create an environment, an agent, and then train for some number of episodes
-        env = NetworkEnvironment(config, g=g)
+        env, k_to_a = create_snapshot_env(config)
     else:
         env = NetworkEnvironment(config)
 
@@ -87,12 +97,12 @@ def main():
     print("Test Results:", ajay.test())
     # print(ajay.problem.get_closeness())
     # print(ajay.problem.get_recommendations())
-    # print([key_to_alias[key] for key in ajay.problem.get_recommendations()])
+    # print([k_to_a[key] for key in ajay.problem.get_recommendations()])
     # # print("Random Results:", rando.run_episode())
     # print("TopK Results:", topk_btwn.run_episode())
     # print(topk_btwn.problem.get_closeness())
     # print(topk_btwn.problem.get_recommendations())
-    # print([key_to_alias[key] for key in topk_btwn.problem.get_recommendations()])
+    # print([k_to_a[key] for key in topk_btwn.problem.get_recommendations()])
     # print("TopK Degree Results:", topk_degree.run_episode())
     # # print("Trained Greedy Results:", trained.run_episode())
     # # print("Greed Results:", greed.run_episode())
