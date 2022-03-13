@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from lightning_gym.GCN import GCN
 from sklearn.preprocessing import MinMaxScaler
+import dgl
 
 
 class TopBtwnAgent:
@@ -55,7 +56,7 @@ class GreedyAgent:
             action = self.pick_greedy_action()
 
             # take action
-            _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
+            _, _, done, _ = self.problem.step(action)  # Take action and find outputs
         self.problem.get_reward()
         return self.problem.btwn_cent
 
@@ -76,6 +77,7 @@ class GreedyAgent:
                 if reward > best_reward:
                     best_action = action
                     best_reward = reward
+                self.problem.btwn_cent -= reward
                 _, _, _, _ = self.problem.step(action, no_calc=True)
 
         return best_action
@@ -128,9 +130,9 @@ class TrainedGreedyAgent:
             action = self.pick_greedy_action(G)
 
             # take action
-            _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
+            _, _, done, _ = self.problem.step(action)  # Take action and find outputs
         self.problem.get_reward()
-        print(self.problem.btwn_cent, self.problem.get_recommendations())
+        # print(self.problem.btwn_cent, self.problem.get_recommendations())
         return self.problem.btwn_cent
 
     def pick_greedy_action(self, G):
@@ -139,7 +141,8 @@ class TrainedGreedyAgent:
         n = 5
         scaler = MinMaxScaler()
 
-        costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
+        # costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
+        costs = -np.array(self.problem.ig_g.es()["cost"])
         costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
         # costs = 1 - costs
         costs = torch.Tensor(costs).unsqueeze(-1)
@@ -156,10 +159,11 @@ class TrainedGreedyAgent:
             for a in predicted_actions:
                 _, reward, _, _ = self.problem.step(a)
                 reward = reward.item()
+                self.problem.btwn_cent -= reward
+                _, _, _, _ = self.problem.step(a, no_calc=True)
                 if reward > best_reward:
                     best_action = a
                     best_reward = reward
-                _, _, _, _ = self.problem.step(a, no_calc=True)
 
         return best_action
 
@@ -170,14 +174,15 @@ class TrainedGreedyAgent:
         pi[illegal_actions] = -float('Inf')
 
         # Calculate distribution from policy network
-        pi = F.softmax(pi, dim=0)
-        dist = torch.distributions.categorical.Categorical(pi)
+        PI = F.softmax(pi, dim=0)
+        dist = torch.distributions.categorical.Categorical(PI)
         probs = dist.probs.detach().numpy()
 
         if n == 1:
             return probs.argmax()  # take the most likely action
         else:
-            return dist.sample((n,))  # sample n actions
+            return np.argpartition(pi.detach().numpy(), -n)[-n:]  # take top n actions
+            # TODO if there are less than n legal actions, the agent will suggest illegal actions
 
 
 class TopDegreeAgent:
