@@ -162,8 +162,10 @@ class NetworkEnvironment(Env):
         if remove:
             self.ig_g.delete_edges((neighbor_id, self.node_id))
             self.ig_g.delete_edges((self.node_id, neighbor_id))
-            self.dgl_g.remove_edges(torch.tensor([neighbor_index, self.node_index]))
-            # self.dgl_g.remove_edges(torch.tensor([self.node_index, neighbor_index]))
+            # self.dgl_g.remove_edges(torch.tensor([neighbor_index, self.node_index]))
+            edge_ids = [self.dgl_g.edge_ids(self.node_index, neighbor_index),
+                        self.dgl_g.edge_ids(neighbor_index, self.node_index)]
+            self.dgl_g.remove_edges(torch.tensor(edge_ids))
             self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:
@@ -262,33 +264,33 @@ class NetworkEnvironment(Env):
             j = torch.arange(self.node_features.size(0)).long()
             self.node_features[j, -1] = self.node_vector
         else:
-            # degrees = np.array(self.ig_g.strength(mode="in"))
-            # norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
-            # norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
+            degrees = np.array(self.ig_g.strength(mode="in"))
+            norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
+            norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
 
-            # eigenness = np.array(self.ig_g.eigenvector_centrality(directed=True, scale=True, weights="cost"))
-            # eigenness[-1] = 0
-            # norm_eigenness = scaler.fit_transform(eigenness.reshape(-1, 1)).squeeze()
-            # norm_eigenness = torch.Tensor(norm_eigenness).unsqueeze(-1)
-
-            # closeness = np.array(self.ig_g.closeness(mode="out", weights="cost"))
-            # closeness[-1] = 0
-            # norm_closeness = scaler.fit_transform(closeness.reshape(-1, 1)).squeeze()
-            # norm_closeness = torch.Tensor(norm_closeness).unsqueeze(-1)
+            eigenness = np.array(self.ig_g.eigenvector_centrality(directed=True, scale=True, weights="cost"))
+            eigenness[-1] = 0
+            norm_eigenness = scaler.fit_transform(eigenness.reshape(-1, 1)).squeeze()
+            norm_eigenness = torch.Tensor(norm_eigenness).unsqueeze(-1)
             #
-            # betweenness = np.array(self.ig_g.betweenness(directed=True,weights="cost"))
-            # betweenness[-1] = 0
-            # norm_betweenness = 1 - (scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze())
-            # norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
+            closeness = np.array(self.ig_g.closeness(mode="out", weights="cost"))
+            closeness[-1] = 0
+            norm_closeness = scaler.fit_transform(closeness.reshape(-1, 1)).squeeze()
+            norm_closeness = torch.Tensor(norm_closeness).unsqueeze(-1)
 
-            # self.node_features = torch.cat((
-            # norm_degrees,
-            # norm_closeness,
-            # norm_betweenness,
-            # norm_eigenness,
-            # self.node_vector.unsqueeze(-1)
-            # ), dim=1)
-            self.node_features = self.node_vector.unsqueeze(-1)
+            betweenness = np.array(self.ig_g.betweenness(directed=True, weights="cost"))
+            betweenness[-1] = 0
+            norm_betweenness = 1 - (scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze())
+            norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
+            #
+            self.node_features = torch.cat((
+                norm_degrees,
+                # norm_closeness,
+                norm_betweenness,
+                norm_eigenness,
+                self.node_vector.unsqueeze(-1)
+            ), dim=1)
+            # self.node_features = self.node_vector.unsqueeze(-1)
 
         self.dgl_g.ndata['features'] = self.node_features
 
