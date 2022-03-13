@@ -10,9 +10,12 @@ class Logger:
     def add_log(self, log_type, val):
         self.log[log_type].append(val)
 
-    def plot_reward(self):
-        X = list(range(0, len(self.log['tot_reward'])))
-        plt.plot(X, self.log['tot_reward'])
+    def get_last_reward(self):
+        return self.log["tot_reward"][-1]
+
+    def plot_reward(self, reward_type="tot_reward"):
+        X = list(range(0, len(self.log[reward_type])))
+        plt.plot(X, self.log[reward_type])
         plt.xlabel("Episodes")
         plt.ylabel("Betweeness Improvement")
         plt.title("Performance of RL Agent on MBIP")
