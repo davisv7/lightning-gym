@@ -1,53 +1,10 @@
-from ln_graph_utils.ln_graph_utils import *
-import os.path as path
-from os import getcwd
 from lightning_gym.utils import print_config, random_seed
-from lightning_gym.envs.lightning_network import NetworkEnvironment
 from ActorCritic import DiscreteActorCritic
 import configparser
-from lightning_gym.graph_utils import undirected, down_sample
 from baselines import *
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
-
-
-def create_snapshot_env(config):
-    json_filename = config["env"]["filename"]
-    ds = config.getboolean("env", "down_sample")
-    nodes, edges = load_json(path.join(getcwd(), "snapshots", json_filename))
-    key_to_alias = dict({x["pub_key"]: x["alias"] for x in nodes})
-
-    # clean nodes
-    active_nodes = get_pubkeys(nodes)
-
-    # clean edges
-    edge_filters = config["edge_filters"]
-    active_edges = clean_edges(edges, edge_filters)
-    active_edges = get_channels_with_attrs(active_edges)
-
-    # Create graph
-    g = nx.MultiDiGraph()
-    g.add_edges_from(active_edges)
-    g = nx.MultiDiGraph(g.subgraph(active_nodes))
-    if ds:
-        g = down_sample(g, config)
-
-    # reduce graph
-    graph_filters = config["graph_filters"]
-    if graph_filters.getboolean("combine_multiedges"):
-        g = simplify_graph(g)
-    if graph_filters.getboolean("remove_bridges"):
-        g = nx.DiGraph(reduce_to_mainnet(g))
-    if graph_filters.getboolean("undirected"):
-        g = undirected(g)
-    if graph_filters.getboolean("unweighted"):
-        nx.set_edge_attributes(g, values=0.1, name='cost')
-
-    print(len(g.nodes()), len(g.edges()))
-
-    # create an environment, an agent, and then train for some number of episodes
-    return NetworkEnvironment(config, g=g), key_to_alias
 
 
 def main():
