@@ -7,15 +7,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def main():
+def gen_budget_data(start=2, stop=8, step=1):
     """
     Override budget in config and repeat the experiment from k=1->15
     :return:
     """
-    parser = argparse.ArgumentParser(description='Run  a simulation according to config.')
-    parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
-    args = parser.parse_args()
-    config_loc = args.config
+    # parser = argparse.ArgumentParser(description='Run  a simulation according to config.')
+    # parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
+    # args = parser.parse_args()
+    config_loc = "configs/test_scale_free.conf"
 
     config = configparser.ConfigParser()
     config.read(config_loc)
@@ -33,7 +33,7 @@ def main():
         random_seed(seed)
         print("seed set")
     env = NetworkEnvironment(config)
-    for i in range(2, 8):
+    for i in range(start, stop + 1, step):
         env.budget = i
         # env = NetworkEnvironment(config)
         agent = DiscreteActorCritic(env, config, test=True)
@@ -44,33 +44,31 @@ def main():
         trained = TrainedGreedyAgent(env, config)
 
         agent_results.append(agent.test())
-        print("Agent Results", agent_results[-1])
         random_results.append(rando.run_episode())
-        print("Random Results:", random_results[-1])
         between_results.append(topk_btwn.run_episode())
-        print("TopK Betweenness Results:", between_results[-1])
         degree_results.append(topk_degree.run_episode())
-        print("TopK Degree Results:", degree_results[-1])
         greedy_results.append(greed.run_episode())
-        print("Greed Results:", greedy_results[-1])
         trained_results.append(trained.run_episode())
-        print("Trained Greed Results:", trained_results[-1])
-        print()
+        # print("Agent Results", agent_results[-1])
+        # print("Random Results:", random_results[-1])
+        # print("TopK Betweenness Results:", between_results[-1])
+        # print("TopK Degree Results:", degree_results[-1])
+        # print("Greed Results:", greedy_results[-1])
+        # print("Trained Greed Results:", trained_results[-1])
+        print(f"Testing budget {i} complete.")
 
-    df = pd.DataFrame(
-        {"Random": random_results,
-         "Betweenness": between_results,
-         "Degree": degree_results,
-         "Agent": agent_results,
-         "Greedy": greedy_results,
-         "Trained Greedy": trained_results})
-    df.plot()
+    df = pd.DataFrame({"Random": random_results,
+                       "Betweenness": between_results,
+                       "Degree": degree_results,
+                       "Agent": agent_results,
+                       "Greedy": greedy_results,
+                       "Trained Greedy": trained_results})
+    df.plot().set_xticks(list(range(0, stop - start+1, step)), list(range(start, stop+1, step)))
     plt.title("Comparison of Betweenness Improvement")
     plt.xlabel("Budget")
     plt.ylabel("Betweenness Improvement")
-    plt.xticks(list(range(0, 21)))
     plt.show()
 
 
 if __name__ == '__main__':
-    main()
+    gen_budget_data()

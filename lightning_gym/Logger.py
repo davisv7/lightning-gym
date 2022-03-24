@@ -17,7 +17,11 @@ class Logger:
         X = list(range(0, len(self.log[reward_type])))
         plt.plot(X, self.log[reward_type])
         plt.xlabel("Episodes")
-        plt.ylabel("Betweeness Improvement")
+        if reward_type == "pog":
+            ylabel = "Percentage of Greedy"
+        else:
+            ylabel = "Betweeness Improvement"
+        plt.ylabel(ylabel)
         plt.title("Performance of RL Agent on MBIP")
         plt.show()
 
