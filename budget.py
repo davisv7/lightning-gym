@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def gen_budget_data(start=2, stop=8, step=1):
+def gen_budget_data(config, start=2, stop=15, step=1):
     """
     Override budget in config and repeat the experiment from k=1->15
     :return:
@@ -15,12 +15,7 @@ def gen_budget_data(start=2, stop=8, step=1):
     # parser = argparse.ArgumentParser(description='Run  a simulation according to config.')
     # parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
     # args = parser.parse_args()
-    config_loc = "configs/test_scale_free.conf"
-
-    config = configparser.ConfigParser()
-    config.read(config_loc)
-    print_config(config)
-    seed = config["env"].getint("seed", fallback=None)
+    verbose = config.getboolean("training", "verbose")
 
     agent_results = []
     random_results = []
@@ -29,9 +24,6 @@ def gen_budget_data(start=2, stop=8, step=1):
     greedy_results = []
     trained_results = []
 
-    if seed:
-        random_seed(seed)
-        print("seed set")
     env = NetworkEnvironment(config)
     for i in range(start, stop + 1, step):
         env.budget = i
@@ -55,7 +47,8 @@ def gen_budget_data(start=2, stop=8, step=1):
         # print("TopK Degree Results:", degree_results[-1])
         # print("Greed Results:", greedy_results[-1])
         # print("Trained Greed Results:", trained_results[-1])
-        print(f"Testing budget {i} complete.")
+        if verbose:
+            print(f"Testing budget {i} complete.")
 
     df = pd.DataFrame({"Random": random_results,
                        "Betweenness": between_results,
@@ -63,7 +56,7 @@ def gen_budget_data(start=2, stop=8, step=1):
                        "Agent": agent_results,
                        "Greedy": greedy_results,
                        "Trained Greedy": trained_results})
-    df.plot().set_xticks(list(range(0, stop - start+1, step)), list(range(start, stop+1, step)))
+    df.plot().set_xticks(list(range(0, stop - start + 1, step)), list(range(start, stop + 1, step)))
     plt.title("Comparison of Betweenness Improvement")
     plt.xlabel("Budget")
     plt.ylabel("Betweenness Improvement")
@@ -71,4 +64,13 @@ def gen_budget_data(start=2, stop=8, step=1):
 
 
 if __name__ == '__main__':
-    gen_budget_data()
+    config = configparser.ConfigParser()
+    config_loc = "configs/test_scale_free.conf"
+    config.read(config_loc)
+    config["env"]["repeat"] = "True"
+    seed = config["env"].getint("seed", fallback=None)
+    print_config(config)
+    if seed:
+        random_seed(seed)
+        print("seed set")
+    gen_budget_data(config)

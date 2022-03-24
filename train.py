@@ -22,15 +22,20 @@ def train_agent(config, pog=False):
     env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
     log = None
+    verbose = config.getboolean("training", "verbose")
     for episode in range(config.getint("training", "episodes")):
         log = ajay.train()
+        last_reward = log.get_last_reward()
         if pog:
-            log.add_log("pog", get_pog(env, config, log.get_last_reward()))
+            pog = get_pog(env, config, log.get_last_reward())
+            log.add_log("pog", pog)
+            last_reward = pog
         recommendations = env.get_recommendations()
-        print("E: {}, S: {}, R: {:.4f}, N:{}".format(episode,
-                                                     env.n,
-                                                     log.get_last_reward(),
-                                                     recommendations))
+        if verbose:
+            print("E: {}, S: {}, R: {:.4f}, N:{}".format(episode,
+                                                         env.n,
+                                                         last_reward,
+                                                         recommendations))
     ajay.save_model()  # Save model to reuse and continue to improve on it
     return log
 
@@ -66,12 +71,17 @@ def print_config(config):
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()
-    print(config.read("./configs/train_scale_free.conf"))
+    config_loc = "./configs/train_scale_free.conf"
+    config.read(config_loc)
     print_config(config)
     seed = config["env"].getint("seed", fallback=None)
     if seed:
         random_seed(seed)
+    pog = True
     # train_upwards(config)
-    log = train_agent(config, pog=True)
+    log = train_agent(config, pog=pog)
     # before_after()
-    log.plot_reward(reward_type="pog")
+    if pog:
+        log.plot_reward(reward_type="pog")
+    else:
+        log.plot_reward()
