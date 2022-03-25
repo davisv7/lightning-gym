@@ -55,13 +55,19 @@ def gen_budget_data(config, start=2, stop=15, step=1):
                        "Degree": degree_results,
                        "Agent": agent_results,
                        "Greedy": greedy_results,
-                       "Trained Greedy": trained_results})
-    df.plot().set_xticks(list(range(0, stop - start + 1, step)), list(range(start, stop + 1, step)))
+                       "Trained Greedy": trained_results}, index=list(range(0, stop - start + 1, step)))
+    df.to_pickle("budget_data.pkl")
+
+
+
+def plot_changing_budget(df=None):
+    if df is None:
+        df = pd.read_pickle("budget_data.pkl")
+    df.plot()
     plt.title("Comparison of Betweenness Improvement")
     plt.xlabel("Budget")
     plt.ylabel("Betweenness Improvement")
     plt.show()
-
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()
@@ -74,3 +80,4 @@ if __name__ == '__main__':
         random_seed(seed)
         print("seed set")
     gen_budget_data(config)
+    plot_changing_budget()

@@ -10,20 +10,6 @@ import matplotlib.pyplot as plt
 
 
 def gen_monthly_data(config):
-    month_prefixes = [
-        "feb",
-        "mar",
-        "april",
-        "may",
-        "june",
-        # "july",
-        # "aug",
-        # "sept",
-        # "oct",
-        # "nov",
-        # "dec"
-    ]
-
     verbose = config.getboolean("training", "verbose")
 
     agent_results = []
@@ -33,13 +19,29 @@ def gen_monthly_data(config):
     # greedy_results = []
     # trained_results = []
 
+    sizes_before = []
+    sizes_after = []
+
+    month_prefixes = [
+        "feb",
+        "mar",
+        "april",
+        "may",
+        "june",
+        "july",
+        "aug",
+        "sept",
+        "oct",
+        "nov",
+        "dec"
+    ]
     for month in month_prefixes:
         config["env"]["filename"] = f"{month}.json"
         config["env"]["repeat"] = "True"
-        env, _ = create_snapshot_env(config)
-        # print_config(config)
+        env, _, (size_before, size_after) = create_snapshot_env(config)
+        sizes_before.append(size_before)
+        sizes_after.append(size_after)
 
-        # env = NetworkEnvironment(config)
         agent = DiscreteActorCritic(env, config, test=True)
         rando = RandomAgent(env)
         topk_btwn = TopBtwnAgent(env)
@@ -56,19 +58,51 @@ def gen_monthly_data(config):
         if verbose:
             print(f"Testing month {month} complete.")
 
-    df = pd.DataFrame({
+    df_baselines = pd.DataFrame({
         "Random": random_results,
         "Betweenness": between_results,
         "Degree": degree_results,
         "Agent": agent_results,
         # "Greedy": greedy_results,
         # "Trained Greedy": trained_results
-    })
-    df.to_pickle("monthly_data.pkl")
-    df.plot().set_xticks(list(range(len(month_prefixes))), month_prefixes)
+    }, index=month_prefixes)
+
+    nodes_b, edges_b = list(zip(*sizes_before))
+    nodes_a, edges_a = list(zip(*sizes_after))
+    df_sizes = pd.DataFrame({
+        "Nodes Before": nodes_b,
+        "Nodes After": nodes_a,
+        "Edges Before": edges_b,
+        "Edges After": edges_a
+    }, index=month_prefixes)
+
+    df_baselines.to_pickle("monthly_data.pkl")
+    df_sizes.to_pickle("sizes_data.pkl")
+
+
+def plot_changing_month(df=None):
+    if df is None:
+        df = pd.read_pickle("monthly_data.pkl")
+    df.plot()
     plt.title("Comparison of Betweenness Improvement")
     plt.xlabel("Month")
     plt.ylabel("Betweenness Improvement")
+    plt.show()
+
+
+def plot_network_size(df=None):
+    if df is None:
+        df = pd.read_pickle("sizes_data.pkl")
+    df[['Nodes Before', 'Nodes After']].plot.bar(rot=0)
+    plt.title("Change in Number of Nodes After Filtering")
+    plt.xlabel("Month")
+    plt.ylabel("Number of Nodes")
+    plt.show()
+
+    df[['Edges Before', 'Edges After']].plot.bar(rot=0)
+    plt.title("Change in Number of Edges After Filtering")
+    plt.xlabel("Month")
+    plt.ylabel("Number of Edges")
     plt.show()
 
 
@@ -81,3 +115,5 @@ if __name__ == '__main__':
     if seed:
         random_seed(seed)
     gen_monthly_data(config)
+    plot_changing_month()
+    plot_network_size()
