@@ -106,7 +106,7 @@ class RandomAgent:
 
 
 class TrainedGreedyAgent:
-    def __init__(self, problem: NetworkEnvironment, config):
+    def __init__(self, problem: NetworkEnvironment, config, n=5):
         self.problem = problem  # environment
         self.path = config.get("agent", "model_file")
         self.in_feats = config.getint("agent", "in_features")
@@ -116,6 +116,7 @@ class TrainedGreedyAgent:
         self.model = GCN(self.in_feats, self.hid_feats, self.out_feats, n_layers=self.layers, activation=F.rrelu)
         self.load_model()
         self.path = config.get("agent", "model_file")
+        self.n = n
 
     def load_model(self):
         self.model.load_state_dict(torch.load(self.path))
@@ -138,7 +139,6 @@ class TrainedGreedyAgent:
     def pick_greedy_action(self, G):
         illegal_actions = self.problem.get_illegal_actions().squeeze().detach().numpy()
         best_action = None
-        n = 5
         scaler = MinMaxScaler()
 
         # costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
@@ -151,11 +151,11 @@ class TrainedGreedyAgent:
         # costs = 1 + costs
         [pi, _] = self.model(G, w=costs)
         # [pi, _] = self.model(G)
-        if self.problem.num_actions + self.problem.budget_offset < 2:
+        if self.problem.num_actions + self.problem.budget_offset < 2 or self.n == 1:
             best_action = self.predict_action(pi, illegal_actions, 1).item()
         else:
             best_reward = -1
-            predicted_actions = list(set(map(lambda x: x.item(), self.predict_action(pi, illegal_actions, n))))
+            predicted_actions = list(set(map(lambda x: x.item(), self.predict_action(pi, illegal_actions, self.n))))
             for a in predicted_actions:
                 _, reward, _, _ = self.problem.step(a)
                 reward = reward.item()
@@ -189,7 +189,7 @@ class TopDegreeAgent:
     def __init__(self, problem: NetworkEnvironment):
         self.problem = problem  # environment
         self.computed = False  # flag indicating whether betweennesses have been calculated
-        self.action_to_btwn = None
+        self.action_to_degree = None
 
     def run_episode(self):  # similar to epochs
         done = False
@@ -205,13 +205,89 @@ class TopDegreeAgent:
         return self.problem.btwn_cent
 
     def compute_degrees(self):
-        betweennesses = self.problem.ig_g.degree()
+        degrees = self.problem.ig_g.degree()
         names = self.problem.ig_g.vs()["name"]
         actions = [self.problem.index_to_node.inverse[name] for name in names]
-        self.action_to_btwn = dict(zip(actions, betweennesses))
+        self.action_to_degrees = dict(zip(actions, degrees))
 
     def pick_topk_action(self):
         self.compute_degrees()
         legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
-        best_action = max(legal_actions, key=lambda x: self.action_to_btwn[x])
+        best_action = max(legal_actions, key=lambda x: self.action_to_degrees[x])
+        return best_action
+
+
+class kCenterAgent:
+    def __init__(self, problem: NetworkEnvironment):
+        self.problem = problem  # environment
+        self.computed = False  # flag indicating whether betweennesses have been calculated
+        self.action_to_degrees = None
+        self.heads = []
+        self.clusters = []
+
+    def run_episode(self):  # similar to epochs
+        done = False
+        _ = self.problem.reset()  # We get our initial state by resetting
+
+        while not done:  # While we haven't exceeded budget
+            # Get action from policy network
+            action = self.pick_kcenter_action()
+
+            # take action
+            _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
+        self.problem.get_reward()
+        print(self.clusters)
+        return self.problem.btwn_cent
+
+    def compute_degrees(self):
+        degrees = self.problem.ig_g.degree()
+        names = self.problem.ig_g.vs()["name"]
+        actions = [self.problem.index_to_node.inverse[name] for name in names]
+        self.action_to_degrees = dict(zip(actions, degrees))
+
+    def pick_kcenter_action(self):
+        # the joining node has no channels, open one up to the highest degree node
+        # make it the head of the mega cluster
+        if self.problem.num_actions + self.problem.budget_offset == 0:
+            self.compute_degrees()
+            legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
+            best_action = max(legal_actions, key=lambda x: self.action_to_degrees[x])
+            self.heads.append(best_action)
+            self.clusters.append(self.problem.ig_g.vs["name"])
+        else:
+            # find the head of the next cluster,
+            # the new head is the node whose distance from the head of its cluster is the greatest
+            new_head = None
+            max_distance = 0
+            for head, cluster in zip(self.heads, self.clusters):
+                paths = self.problem.ig_g.get_shortest_paths(head, to=cluster)
+                path_lengths = np.array(list(map(lambda x: len(x) - 1, paths)))
+                path_lengths = np.where(path_lengths == -1, float("inf"), path_lengths)
+                max_path_len = np.max(path_lengths)
+                if max_path_len > max_distance:
+                    max_ind = np.argmax(path_lengths, axis=0)
+                    new_head = paths[max_ind][-1]
+                    max_distance = max_path_len
+
+            # if the distance of that node to its head is greater than its distance to the new head
+            # remove nodes from the previous cluster and add them to the new cluster
+            new_cluster = []
+            paths_to_new_head = self.problem.ig_g.get_shortest_paths(new_head)
+            lengths_to_new_head = np.array(list(map(lambda x: len(x) - 1, paths_to_new_head)))
+            lengths_to_new_head = np.where(lengths_to_new_head == -1, float("inf"), lengths_to_new_head)
+            lengths_to_new_head = dict(zip(self.problem.ig_g.vs["name"], lengths_to_new_head))
+            for head, cluster in zip(self.heads, self.clusters):
+                paths = self.problem.ig_g.get_shortest_paths(head, to=cluster)
+                lengths_to_curr_head = np.array(list(map(lambda x: len(x) - 1, paths)))
+                lengths_to_curr_head = np.where(lengths_to_curr_head == -1, float("inf"), lengths_to_curr_head)
+                lengths_to_curr_head = dict(zip(cluster, lengths_to_curr_head))
+                for node, length_to_curr_head in lengths_to_curr_head.items():
+                    length_to_new_head = lengths_to_new_head[node]
+                    if length_to_curr_head >= length_to_new_head:
+                        new_cluster.append(node)
+            for i in range(len(self.clusters)):
+                self.clusters[i] = list(set(self.clusters[i]) - set(new_cluster))
+            self.clusters.append(new_cluster)
+            self.heads.append(new_head)
+            best_action = new_head
         return best_action

@@ -43,7 +43,7 @@ def create_snapshot_env(config):
     if graph_filters.getboolean("unweighted"):
         nx.set_edge_attributes(g, values=0.1, name='cost')
 
-    size_after = len(g.nodes()), len(g.edges())//2
+    size_after = len(g.nodes()), len(g.edges()) // 2
     print(size_after)
 
     # create an environment, an agent, and then train for some number of episodes
@@ -61,8 +61,8 @@ def main():
     parser = argparse.ArgumentParser(description='Run  a simulation according to config.')
     # parser.add_argument("--config", type=str, default="configs/train_snapshot.conf")
     # parser.add_argument("--config", type=str, default="./configs/train_scale_free.conf")
-    parser.add_argument("--config", type=str, default="configs/test_snapshot.conf")
-    # parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
+    # parser.add_argument("--config", type=str, default="configs/test_snapshot.conf")
+    parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
     args = parser.parse_args()
     config_loc = args.config
 
@@ -76,24 +76,24 @@ def main():
         print("seed set")
 
     if config["env"]["graph_type"] == "snapshot":
-        env, k_to_a,_ = create_snapshot_env(config)
+        env, k_to_a, _ = create_snapshot_env(config)
     else:
         env = NetworkEnvironment(config)
 
-    # env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
     # rando = RandomAgent(env)
     # topk_btwn = TopBtwnAgent(env)
     # topk_degree = TopDegreeAgent(env)
     # greed = GreedyAgent(env)
-    trained = TrainedGreedyAgent(env, config)
+    kCenter = kCenterAgent(env)
+    # trained = TrainedGreedyAgent(env, config)
 
-    num_episodes = config.getint("training", "episodes")
-    for episode in range(num_episodes):
-        log = ajay.train()
-        recommendations = env.get_recommendations()
-        print("E: {}, R: {:.4f}, N:{}".format(episode, env.btwn_cent, recommendations))
-    ajay.save_model()
+    # num_episodes = config.getint("training", "episodes")
+    # for episode in range(num_episodes):
+    #     log = ajay.train()
+    #     recommendations = env.get_recommendations()
+    #     print("E: {}, R: {:.4f}, N:{}".format(episode, env.btwn_cent, recommendations))
+    # ajay.save_model()
 
     print("Test Results:", ajay.test())
     # print(ajay.problem.get_closeness())
@@ -105,7 +105,8 @@ def main():
     # print(topk_btwn.problem.get_recommendations())
     # print([k_to_a[key] for key in topk_btwn.problem.get_recommendations()])
     # print("TopK Degree Results:", topk_degree.run_episode())
-    print("Trained Greedy Results:", trained.run_episode())
+    # print("Trained Greedy Results:", trained.run_episode())
+    print("kCenter Results:", kCenter.run_episode())
     # # print("Greed Results:", greed.run_episode())
     # print('total reward: ', ajay.logger.log['tot_reward'])
     # print("td error: ", ajay.logger.log['td_error'])
