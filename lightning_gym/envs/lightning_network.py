@@ -5,6 +5,7 @@ import torch
 from ..graph_utils import *
 from os import getcwd, path
 from sklearn.preprocessing import MinMaxScaler
+from igraph import Graph as iGraph
 
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
@@ -31,7 +32,7 @@ class NetworkEnvironment(Env):
         # graphs
         self.base_graph = g
         self.nx_graph = None
-        self.ig_g = None
+        self.ig_g: iGraph
         self.dgl_g = None
 
         # useful attributes if node_id is not default
