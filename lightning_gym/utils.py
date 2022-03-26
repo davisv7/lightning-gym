@@ -27,7 +27,7 @@ def plot_apsp(nx_graph):  # apsp:all pair shortest paths
     shortest_lengths = list(nx.all_pairs_bellman_ford_path_length(nx_graph))  # gives list of lengths
     shortest_lengths = [x[1].values() for x in shortest_lengths]
     shortest_lengths = list(itertools.chain(*shortest_lengths))
-    plt.hist(shortest_lengths, bins=list(range(10)) + list(range(100, 1000, 100)) + list(range(1001, 10000, 1000)))
+    plt.hist(shortest_lengths)
     plt.show()
 
 
