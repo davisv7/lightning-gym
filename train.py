@@ -6,6 +6,8 @@ from lightning_gym.utils import plot_apsp
 import configparser
 from lightning_gym.utils import random_seed
 from baselines import TrainedGreedyAgent
+import pandas as pd
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
@@ -52,14 +54,35 @@ def train_upwards(config):
         config["agent"]["load_model"] = "True"
 
 
-def before_after(k=1000, load_model=True):
+def before_after(config, k=1024):
     env = NetworkEnvironment(config)
-    ajay = DiscreteActorCritic(env, config)
-    env.reset()
-    plot_apsp(env.nx_graph)
-    log = ajay.test()
-    print("E: 1, S: {}, R: {:.2f}".format(k, log.log["tot_reward"][-1]))
-    plot_apsp(env.nx_graph)
+    ajay = TrainedGreedyAgent(env, config, n=1)
+
+    # plot_apsp(env.nx_graph)
+    # btwn_cent = ajay.run_episode()
+    # print("E: 1, S: {}, R: {:.2f}".format(k, btwn_cent))
+    # plot_apsp(env.nx_graph)
+    done = False
+    G = ajay.problem.reset()  # We get our initial state by resetting
+    avg_path_lengths = []
+    max_path_lengths = []
+    while not done:  # While we haven't exceeded budget
+        # Get action from policy network
+        action = ajay.pick_greedy_action(G)
+
+        # take action
+        _, _, done, _ = ajay.problem.step(action)  # Take action and find outputs
+
+        # record average path length
+        avg_path_lengths.append(ajay.problem.ig_g.average_path_length())
+        max_path_lengths.append(ajay.problem.ig_g.diameter())
+    df = pd.DataFrame({
+        "Average Path Lengths": avg_path_lengths,
+        "Diameter": max_path_lengths
+    })
+    df.plot()
+    plt.ylim(ymin=0)  # this line
+    plt.show()
 
 
 def print_config(config):
@@ -85,3 +108,12 @@ if __name__ == '__main__':
         log.plot_reward(reward_type="pog")
     else:
         log.plot_reward()
+
+    config = configparser.ConfigParser()
+    config_loc = "./configs/test_scale_free.conf"
+    config.read(config_loc)
+    print_config(config)
+    seed = config["env"].getint("seed", fallback=None)
+    if seed:
+        random_seed(seed)
+    before_after(config)
