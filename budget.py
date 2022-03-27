@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def gen_budget_data(config, start=2, stop=15, step=1):
+def gen_budget_data(config, start=1, stop=15, step=1):
     """
     Override budget in config and repeat the experiment from k=1->15
     :return:
@@ -23,6 +23,7 @@ def gen_budget_data(config, start=2, stop=15, step=1):
     degree_results = []
     greedy_results = []
     trained_results = []
+    kcenter_results = []
 
     env = NetworkEnvironment(config)
     for i in range(start, stop + 1, step):
@@ -34,6 +35,7 @@ def gen_budget_data(config, start=2, stop=15, step=1):
         topk_degree = TopDegreeAgent(env)
         greed = GreedyAgent(env)
         trained = TrainedGreedyAgent(env, config)
+        kcenter = kCenterAgent(env)
 
         agent_results.append(agent.test())
         random_results.append(rando.run_episode())
@@ -41,23 +43,28 @@ def gen_budget_data(config, start=2, stop=15, step=1):
         degree_results.append(topk_degree.run_episode())
         greedy_results.append(greed.run_episode())
         trained_results.append(trained.run_episode())
-        # print("Agent Results", agent_results[-1])
-        # print("Random Results:", random_results[-1])
-        # print("TopK Betweenness Results:", between_results[-1])
-        # print("TopK Degree Results:", degree_results[-1])
-        # print("Greed Results:", greedy_results[-1])
-        # print("Trained Greed Results:", trained_results[-1])
+        kcenter_results.append(kcenter.run_episode())
+        print("Agent Results", agent_results[-1])
+        print("Random Results:", random_results[-1])
+        print("TopK Betweenness Results:", between_results[-1])
+        print("TopK Degree Results:", degree_results[-1])
+        print("Greed Results:", greedy_results[-1])
+        print("Trained Greed Results:", trained_results[-1])
+        print("kCenter Results:", kcenter_results[-1])
+        print()
         if verbose:
             print(f"Testing budget {i} complete.")
 
-    df = pd.DataFrame({"Random": random_results,
-                       "Betweenness": between_results,
-                       "Degree": degree_results,
-                       "Agent": agent_results,
-                       "Greedy": greedy_results,
-                       "Trained Greedy": trained_results}, index=list(range(0, stop - start + 1, step)))
+    df = pd.DataFrame({
+        "Random": random_results,
+        "Betweenness": between_results,
+        "Degree": degree_results,
+        "Agent": agent_results,
+        "Greedy": greedy_results,
+        "Trained Greedy": trained_results,
+        "kCenter": kcenter_results
+    }, index=list(range(0, stop - start + 1, step)))
     df.to_pickle("budget_data.pkl")
-
 
 
 def plot_changing_budget(df=None):
@@ -68,6 +75,7 @@ def plot_changing_budget(df=None):
     plt.xlabel("Budget")
     plt.ylabel("Betweenness Improvement")
     plt.show()
+
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()

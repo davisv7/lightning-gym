@@ -5,7 +5,7 @@ from lightning_gym.Logger import Logger
 from lightning_gym.utils import plot_apsp
 import configparser
 from lightning_gym.utils import random_seed
-from baselines import TrainedGreedyAgent
+from baselines import TrainedGreedyAgent, kCenterAgent
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -57,6 +57,7 @@ def train_upwards(config):
 def before_after(config, k=1024):
     env = NetworkEnvironment(config)
     ajay = TrainedGreedyAgent(env, config, n=1)
+    kcenter = kCenterAgent(env)
 
     # plot_apsp(env.nx_graph)
     # btwn_cent = ajay.run_episode()
@@ -66,19 +67,32 @@ def before_after(config, k=1024):
     G = ajay.problem.reset()  # We get our initial state by resetting
     avg_path_lengths = []
     max_path_lengths = []
+    k_avg = []
+    k_max = []
     while not done:  # While we haven't exceeded budget
         # Get action from policy network
         action = ajay.pick_greedy_action(G)
-
         # take action
         _, _, done, _ = ajay.problem.step(action)  # Take action and find outputs
-
         # record average path length
         avg_path_lengths.append(ajay.problem.ig_g.average_path_length())
         max_path_lengths.append(ajay.problem.ig_g.diameter())
+
+    done = False
+    kcenter.problem.reset()  # We get our initial state by resetting
+    while not done:  # While we haven't exceeded budget
+        # Get action from policy network
+        action = kcenter.pick_kcenter_action()
+        # take action
+        _, _, done, _ = kcenter.problem.step(action)  # Take action and find outputs
+        # record average path length
+        k_avg.append(kcenter.problem.ig_g.average_path_length())
+        k_max.append(kcenter.problem.ig_g.diameter())
     df = pd.DataFrame({
-        "Average Path Lengths": avg_path_lengths,
-        "Diameter": max_path_lengths
+        "Agent Avg": avg_path_lengths,
+        "Agent Diameter": max_path_lengths,
+        "kCenter Avg": k_avg,
+        "kCenter Diameter": k_max
     })
     df.plot()
     plt.ylim(ymin=0)  # this line
@@ -93,21 +107,21 @@ def print_config(config):
 
 
 if __name__ == '__main__':
-    config = configparser.ConfigParser()
-    config_loc = "./configs/train_scale_free.conf"
-    config.read(config_loc)
-    print_config(config)
-    seed = config["env"].getint("seed", fallback=None)
-    if seed:
-        random_seed(seed)
-    pog = True
-    # train_upwards(config)
-    log = train_agent(config, pog=pog)
-    # before_after()
-    if pog:
-        log.plot_reward(reward_type="pog")
-    else:
-        log.plot_reward()
+    # config = configparser.ConfigParser()
+    # config_loc = "./configs/train_scale_free.conf"
+    # config.read(config_loc)
+    # print_config(config)
+    # seed = config["env"].getint("seed", fallback=None)
+    # if seed:
+    #     random_seed(seed)
+    # pog = True
+    # # train_upwards(config)
+    # log = train_agent(config, pog=pog)
+    # # before_after()
+    # if pog:
+    #     log.plot_reward(reward_type="pog")
+    # else:
+    #     log.plot_reward()
 
     config = configparser.ConfigParser()
     config_loc = "./configs/test_scale_free.conf"

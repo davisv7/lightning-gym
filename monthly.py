@@ -18,6 +18,7 @@ def gen_monthly_data(config):
     degree_results = []
     # greedy_results = []
     # trained_results = []
+    kcenter_results = []
 
     sizes_before = []
     sizes_after = []
@@ -48,6 +49,7 @@ def gen_monthly_data(config):
         topk_degree = TopDegreeAgent(env)
         # greed = GreedyAgent(env)
         # trained = TrainedGreedyAgent(env, config)
+        kcenter = kCenterAgent(env)
 
         agent_results.append(agent.test())
         random_results.append(rando.run_episode())
@@ -55,6 +57,8 @@ def gen_monthly_data(config):
         degree_results.append(topk_degree.run_episode())
         # greedy_results.append(greed.run_episode())
         # trained_results.append(trained.run_episode())
+        kcenter_results.append(kcenter.run_episode())
+
         if verbose:
             print(f"Testing month {month} complete.")
 
@@ -64,7 +68,8 @@ def gen_monthly_data(config):
         "Degree": degree_results,
         "Agent": agent_results,
         # "Greedy": greedy_results,
-        # "Trained Greedy": trained_results
+        # "Trained Greedy": trained_results,
+        "kCenter": kcenter_results
     }, index=month_prefixes)
 
     nodes_b, edges_b = list(zip(*sizes_before))
