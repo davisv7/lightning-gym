@@ -236,7 +236,6 @@ class kCenterAgent:
             # take action
             _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
         self.problem.get_reward()
-        print(self.clusters)
         return self.problem.btwn_cent
 
     def compute_degrees(self):
@@ -255,6 +254,9 @@ class kCenterAgent:
             self.heads.append(best_action)
             self.clusters.append(self.problem.ig_g.vs["name"])
         else:
+            if len(self.heads) == 0:
+                print("Nodes with preexisting neighbors has not yet been implemented.")
+                raise Exception
             # find the head of the next cluster,
             # the new head is the node whose distance from the head of its cluster is the greatest
             new_head = None
@@ -270,7 +272,7 @@ class kCenterAgent:
                     max_distance = max_path_len
 
             # if the distance of that node to its head is greater than its distance to the new head
-            # remove nodes from the previous cluster and add them to the new cluster
+            # add them to the new cluster
             new_cluster = []
             paths_to_new_head = self.problem.ig_g.get_shortest_paths(new_head)
             lengths_to_new_head = np.array(list(map(lambda x: len(x) - 1, paths_to_new_head)))
@@ -285,6 +287,8 @@ class kCenterAgent:
                     length_to_new_head = lengths_to_new_head[node]
                     if length_to_curr_head >= length_to_new_head:
                         new_cluster.append(node)
+
+            # remove nodes in the new cluster from the previous clusters
             for i in range(len(self.clusters)):
                 self.clusters[i] = list(set(self.clusters[i]) - set(new_cluster))
             self.clusters.append(new_cluster)
