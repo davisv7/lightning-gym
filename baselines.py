@@ -253,6 +253,7 @@ class kCenterAgent:
             best_action = max(legal_actions, key=lambda x: self.action_to_degrees[x])
             self.heads.append(best_action)
             self.clusters.append(self.problem.ig_g.vs["name"])
+            self.clusters[0] = list(set(self.clusters[0]) - {best_action})
         else:
             if len(self.heads) == 0:
                 print("Nodes with preexisting neighbors has not yet been implemented.")
@@ -261,8 +262,9 @@ class kCenterAgent:
             # the new head is the node whose distance from the head of its cluster is the greatest
             new_head = None
             max_distance = 0
+            illegal_actions = self.problem.get_illegal_actions().squeeze().detach().numpy()
             for head, cluster in zip(self.heads, self.clusters):
-                paths = self.problem.ig_g.get_shortest_paths(head, to=cluster)
+                paths = self.problem.ig_g.get_shortest_paths(head, to=np.setdiff1d(cluster, illegal_actions))
                 path_lengths = np.array(list(map(lambda x: len(x) - 1, paths)))
                 path_lengths = np.where(path_lengths == -1, float("inf"), path_lengths)
                 max_path_len = np.max(path_lengths)
