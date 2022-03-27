@@ -7,6 +7,7 @@ from os.path import join
 from main import create_snapshot_env
 import pandas as pd
 import matplotlib.pyplot as plt
+from timeit import default_timer as timer
 
 
 def gen_monthly_data(config):
@@ -19,6 +20,7 @@ def gen_monthly_data(config):
     # greedy_results = []
     # trained_results = []
     kcenter_results = []
+    times = []
 
     sizes_before = []
     sizes_after = []
@@ -51,17 +53,27 @@ def gen_monthly_data(config):
         # trained = TrainedGreedyAgent(env, config)
         kcenter = kCenterAgent(env)
 
-        agent_results.append(agent.test())
+        start = timer()
+        round_time = []
         random_results.append(rando.run_episode())
+        round_time.append(timer() - start)
         between_results.append(topk_btwn.run_episode())
+        round_time.append(timer() - sum(round_time))
         degree_results.append(topk_degree.run_episode())
+        round_time.append(timer() - sum(round_time))
+        agent_results.append(agent.test())
+        round_time.append(timer() - sum(round_time))
         # greedy_results.append(greed.run_episode())
+        round_time.append(timer() - sum(round_time))
         # trained_results.append(trained.run_episode())
+        round_time.append(timer() - sum(round_time))
         kcenter_results.append(kcenter.run_episode())
-
+        round_time.append(timer() - sum(round_time))
+        times.append(round_time)
         if verbose:
             print(f"Testing month {month} complete.")
 
+    # performance
     df_baselines = pd.DataFrame({
         "Random": random_results,
         "Betweenness": between_results,
@@ -72,6 +84,7 @@ def gen_monthly_data(config):
         "kCenter": kcenter_results
     }, index=month_prefixes)
 
+    # network size
     nodes_b, edges_b = list(zip(*sizes_before))
     nodes_a, edges_a = list(zip(*sizes_after))
     df_sizes = pd.DataFrame({
@@ -81,8 +94,22 @@ def gen_monthly_data(config):
         "Edges After": edges_a
     }, index=month_prefixes)
 
+    df_runtimes = pd.DataFrame(dict(zip(
+        [
+            "Random",
+            "Betweenness",
+            "Degree",
+            "Agent",
+            # "Greedy",
+            # "Trained Greedy",
+            "kCenter"
+        ], zip(*times)
+    )), index=month_prefixes)
+
+    # save results
     df_baselines.to_pickle("monthly_data.pkl")
     df_sizes.to_pickle("sizes_data.pkl")
+    df_runtimes.to_pickle("runtime_data.pkl")
 
 
 def plot_changing_month(df=None):
@@ -111,6 +138,17 @@ def plot_network_size(df=None):
     plt.show()
 
 
+def plot_runtimes(df=None):
+    if df is None:
+        df = pd.read_pickle("runtime_data.pkl")
+    print(df)
+    df.plot()
+    plt.title("Comparison of Runtimes")
+    plt.xlabel("Month")
+    plt.ylabel("Runtime (s)")
+    plt.show()
+
+
 if __name__ == '__main__':
     config = configparser.ConfigParser()
     config_loc = "./configs/test_snapshot.conf"
@@ -122,3 +160,4 @@ if __name__ == '__main__':
     gen_monthly_data(config)
     plot_changing_month()
     plot_network_size()
+    plot_runtimes()
