@@ -230,6 +230,7 @@ class NetworkEnvironment(Env):
         if self.budget_offset < 2:
             self.btwn_cent = 0
         else:
+            self.btwn_cent = 0
             self.btwn_cent = self.get_reward()
         return self.dgl_g
 
