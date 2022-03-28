@@ -131,7 +131,8 @@ class TrainedGreedyAgent:
             action = self.pick_greedy_action(G)
 
             # take action
-            _, _, done, _ = self.problem.step(action)  # Take action and find outputs
+            no_calc = self.n == 1
+            _, _, done, _ = self.problem.step(action, no_calc=no_calc)  # Take action and find outputs
         self.problem.get_reward()
         # print(self.problem.btwn_cent, self.problem.get_recommendations())
         return self.problem.btwn_cent
