@@ -308,18 +308,18 @@ def make_edges_from_template(node_id, nbr_ids):
         edge = {
             "channel_id": randint(799999999999999999, 999999999999999999),
             "last_update": time.time(),
-            "capacity": 1e8,
+            "capacity": 1e6,
             "node1_policy": {
                 "time_lock_delta": 100,
                 "min_htlc": 1000,
-                "fee_base_msat": 0,
+                "fee_base_msat": 1000,
                 "fee_rate_milli_msat": 1000,
                 "disabled": False,
             },
             "node2_policy": {
                 "time_lock_delta": 100,
                 "min_htlc": 1000,
-                "fee_base_msat": 0,
+                "fee_base_msat": 1000,
                 "fee_rate_milli_msat": 1000,
                 "disabled": False,
             },
