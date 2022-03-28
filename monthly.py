@@ -1,9 +1,8 @@
-from train import train_agent, print_config
+from train import print_config
 from lightning_gym.utils import random_seed
 from ActorCritic import DiscreteActorCritic
 import configparser
 from baselines import *
-from os.path import join
 from main import create_snapshot_env
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -45,7 +44,7 @@ def gen_monthly_data(config):
         sizes_before.append(size_before)
         sizes_after.append(size_after)
 
-        agent = DiscreteActorCritic(env, config, test=True)
+        agent = TrainedGreedyAgent(env, config, n=1)
         rando = RandomAgent(env)
         topk_btwn = TopBtwnAgent(env)
         topk_degree = TopDegreeAgent(env)
@@ -53,32 +52,37 @@ def gen_monthly_data(config):
         # trained = TrainedGreedyAgent(env, config)
         kcenter = kCenterAgent(env)
 
+        baseline_list = [agent,
+                         rando,
+                         topk_btwn,
+                         topk_degree,
+                         # greed,
+                         # trained,
+                         kcenter]
+        results_list = [agent_results,
+                        random_results,
+                        between_results,
+                        degree_results,
+                        # greedy_results ,
+                        # trained_results ,
+                        kcenter_results]
+
         start = timer()
         round_time = []
-        random_results.append(rando.run_episode())
-        round_time.append(timer() - start)
-        between_results.append(topk_btwn.run_episode())
-        round_time.append(timer() - sum(round_time))
-        degree_results.append(topk_degree.run_episode())
-        round_time.append(timer() - sum(round_time))
-        agent_results.append(agent.test())
-        round_time.append(timer() - sum(round_time))
-        # greedy_results.append(greed.run_episode())
-        round_time.append(timer() - sum(round_time))
-        # trained_results.append(trained.run_episode())
-        round_time.append(timer() - sum(round_time))
-        kcenter_results.append(kcenter.run_episode())
-        round_time.append(timer() - sum(round_time))
+        for baseline, r_list in zip(baseline_list, results_list):
+            r_list.append(baseline.run_episode())
+            round_time.append(timer() - (start+sum(round_time)))
         times.append(round_time)
+
         if verbose:
             print(f"Testing month {month} complete.")
 
     # performance
     df_baselines = pd.DataFrame({
+        "Agent": agent_results,
         "Random": random_results,
         "Betweenness": between_results,
         "Degree": degree_results,
-        "Agent": agent_results,
         # "Greedy": greedy_results,
         # "Trained Greedy": trained_results,
         "kCenter": kcenter_results
@@ -96,10 +100,10 @@ def gen_monthly_data(config):
 
     df_runtimes = pd.DataFrame(dict(zip(
         [
+            "Agent",
             "Random",
             "Betweenness",
             "Degree",
-            "Agent",
             # "Greedy",
             # "Trained Greedy",
             "kCenter"
@@ -109,7 +113,7 @@ def gen_monthly_data(config):
     # save results
     df_baselines.to_pickle("monthly_data.pkl")
     df_sizes.to_pickle("sizes_data.pkl")
-    df_runtimes.to_pickle("runtime_data.pkl")
+    # df_runtimes.to_pickle("runtime_data.pkl")
 
 
 def plot_changing_month(df=None):
@@ -160,4 +164,4 @@ if __name__ == '__main__':
     gen_monthly_data(config)
     plot_changing_month()
     plot_network_size()
-    plot_runtimes()
+    # plot_runtimes()
