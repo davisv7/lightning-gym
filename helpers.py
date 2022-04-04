@@ -308,19 +308,19 @@ def make_edges_from_template(node_id, nbr_ids):
         edge = {
             "channel_id": randint(799999999999999999, 999999999999999999),
             "last_update": time.time(),
-            "capacity": 1e6,
+            "capacity": 5e6,
             "node1_policy": {
                 "time_lock_delta": 100,
                 "min_htlc": 1000,
                 "fee_base_msat": 1000,
-                "fee_rate_milli_msat": 1000,
+                "fee_rate_milli_msat": 1,
                 "disabled": False,
             },
             "node2_policy": {
                 "time_lock_delta": 100,
                 "min_htlc": 1000,
                 "fee_base_msat": 1000,
-                "fee_rate_milli_msat": 1000,
+                "fee_rate_milli_msat": 1,
                 "disabled": False,
             },
             "node1_pub": node_id,
@@ -368,32 +368,27 @@ def load_temp_data(json_files, node_keys=["pub_key", "last_update"],
 def preprocess_json_file(json_file, additional_node, additional_edges):
     """Generate directed graph data (traffic simulator input format) from json LN snapshot file."""
     json_files = [json_file]
-    # print("\ni.) Load data")
-    node_keys = ["pub_key", "last_update"],
+    print("\ni.) Load data")
     EDGE_KEYS = ["node1_pub", "node2_pub", "last_update", "capacity", "channel_id", 'node1_policy', 'node2_policy']
     nodes, edges = load_temp_data(json_files, edge_keys=EDGE_KEYS)
-    # print(len(nodes), len(edges))
 
-    # add candidate nodes
-    pd_add_node = pd.DataFrame([additional_node])
+    # add new edges
     pd_add_edges = pd.DataFrame(additional_edges)
     edges = pd.concat([edges, pd_add_edges])
-    # nodes = pd.concat([nodes, pd_add_node])
     edges = edges.reset_index(drop=True)
-    # nodes = nodes.reset_index(drop=True)
-    # print(len(nodes), len(edges))
+    print(len(nodes), len(edges))
 
-    # print("Remove records with missing node policy")
-    # print(edges.isnull().sum() / len(edges))
+    print("Remove records with missing node policy")
+    print(edges.isnull().sum() / len(edges))
     origi_size = len(edges)
     edges = edges[(~edges["node1_policy"].isnull()) & (~edges["node2_policy"].isnull())]
-    # print(origi_size - len(edges))
-    # print("\nii.) Transform undirected graph into directed graph")
+    print(origi_size - len(edges))
+    print("\nii.) Transform undirected graph into directed graph")
     directed_df = generate_directed_graph(edges)
-    # print(directed_df.head())
-    # print("\niii.) Fill missing policy values with most frequent values")
-    # print("missing values for columns:")
-    # print(directed_df.isnull().sum())
+    print(directed_df.head())
+    print("\niii.) Fill missing policy values with most frequent values")
+    print("missing values for columns:")
+    print(directed_df.isnull().sum())
     directed_df = directed_df.fillna(
         {"disabled": False, "fee_base_msat": 1000, "fee_rate_milli_msat": 1, "min_htlc": 1000})
     for col in ["fee_base_msat", "fee_rate_milli_msat", "min_htlc"]:
@@ -418,7 +413,7 @@ def eval_recommendations(base_graph, nbr_ids, node_id):
 
     # SIMULATOR PARAMS
     transaction_size = 60000
-    num_transactions = 8000
+    num_transactions = 10000
     epsilon = 0.8
     drop_disabled = True
     drop_low_cap = False
@@ -441,7 +436,7 @@ def eval_recommendations(base_graph, nbr_ids, node_id):
     top_5_income = total_income.sort_values("fee", ascending=False).set_index("node").head(5)
     top_5_traffic = total_income.sort_values("num_trans", ascending=False).set_index("node").head(5)
     node_income = all_router_fees.groupby("node")["fee"].sum().get(node_id, 0)  # return 0 if node did not make any fees
-    node_traffic=total_income.sort_values("num_trans", ascending=False).get(node_id, 0)
+    node_traffic = total_income.sort_values("num_trans", ascending=False).get(node_id, 0)
     # median = all_router_fees.groupby("node")["fee"].sum().median()
     print("Top 5 earners:")
     print(top_5_income)

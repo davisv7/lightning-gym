@@ -142,8 +142,8 @@ class TrainedGreedyAgent:
         best_action = None
         scaler = MinMaxScaler()
 
-        # costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
-        costs = -np.array(self.problem.ig_g.es()["cost"])
+        costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
+        # costs = -np.array(self.problem.ig_g.es()["cost"])
         costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
         # costs = 1 - costs
         costs = torch.Tensor(costs).unsqueeze(-1)
