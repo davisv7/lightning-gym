@@ -13,10 +13,11 @@ warnings.filterwarnings("ignore")
 
 
 def get_pog(env, config, last_reward):
+    old_setting = env.repeat
     env.repeat = True
     greedy = TrainedGreedyAgent(env, config)
     g_reward = greedy.run_episode()
-    env.repeat = False
+    env.repeat = old_setting
     return round(last_reward / g_reward, 4)
 
 
@@ -27,9 +28,9 @@ def train_agent(config, pog=False):
     verbose = config.getboolean("training", "verbose")
     for episode in range(config.getint("training", "episodes")):
         log = ajay.train()
-        last_reward = log.get_last_reward()
+        last_reward = ajay.problem.get_betweenness()
         if pog:
-            pog = get_pog(env, config, log.get_last_reward())
+            pog = get_pog(env, config, last_reward)
             log.add_log("pog", pog)
             last_reward = pog
         recommendations = env.get_recommendations()
@@ -54,51 +55,6 @@ def train_upwards(config):
         config["agent"]["load_model"] = "True"
 
 
-def before_after(config, k=1024):
-    env = NetworkEnvironment(config)
-    ajay = TrainedGreedyAgent(env, config, n=1)
-    kcenter = kCenterAgent(env)
-
-    # plot_apsp(env.nx_graph)
-    # btwn_cent = ajay.run_episode()
-    # print("E: 1, S: {}, R: {:.2f}".format(k, btwn_cent))
-    # plot_apsp(env.nx_graph)
-    done = False
-    G = ajay.problem.reset()  # We get our initial state by resetting
-    avg_path_lengths = []
-    max_path_lengths = []
-    k_avg = []
-    k_max = []
-    while not done:  # While we haven't exceeded budget
-        # Get action from policy network
-        action = ajay.pick_greedy_action(G)
-        # take action
-        _, _, done, _ = ajay.problem.step(action)  # Take action and find outputs
-        # record average path length
-        avg_path_lengths.append(ajay.problem.ig_g.average_path_length())
-        max_path_lengths.append(ajay.problem.ig_g.diameter())
-
-    done = False
-    kcenter.problem.reset()  # We get our initial state by resetting
-    while not done:  # While we haven't exceeded budget
-        # Get action from policy network
-        action = kcenter.pick_kcenter_action()
-        # take action
-        _, _, done, _ = kcenter.problem.step(action)  # Take action and find outputs
-        # record average path length
-        k_avg.append(kcenter.problem.ig_g.average_path_length())
-        k_max.append(kcenter.problem.ig_g.diameter())
-    df = pd.DataFrame({
-        "Agent Avg": avg_path_lengths,
-        "Agent Diameter": max_path_lengths,
-        "kCenter Avg": k_avg,
-        "kCenter Diameter": k_max
-    })
-    df.plot()
-    plt.ylim(ymin=0)  # this line
-    plt.show()
-
-
 def print_config(config):
     for section in config.sections():
         print(section)
@@ -107,27 +63,27 @@ def print_config(config):
 
 
 if __name__ == '__main__':
-    # config = configparser.ConfigParser()
-    # config_loc = "./configs/train_scale_free.conf"
-    # config.read(config_loc)
-    # print_config(config)
-    # seed = config["env"].getint("seed", fallback=None)
-    # if seed:
-    #     random_seed(seed)
-    # pog = True
-    # # train_upwards(config)
-    # log = train_agent(config, pog=pog)
-    # # before_after()
-    # if pog:
-    #     log.plot_reward(reward_type="pog")
-    # else:
-    #     log.plot_reward()
-
     config = configparser.ConfigParser()
-    config_loc = "./configs/test_scale_free.conf"
+    config_loc = "./configs/train_scale_free.conf"
     config.read(config_loc)
     print_config(config)
     seed = config["env"].getint("seed", fallback=None)
     if seed:
         random_seed(seed)
-    before_after(config)
+    pog = True
+    # train_upwards(config)
+    log = train_agent(config, pog=pog)
+    # before_after()
+    if pog:
+        log.plot_reward(reward_type="pog")
+    else:
+        log.plot_reward()
+
+    # config = configparser.ConfigParser()
+    # config_loc = "./configs/test_scale_free.conf"
+    # config.read(config_loc)
+    # print_config(config)
+    # seed = config["env"].getint("seed", fallback=None)
+    # if seed:
+    #     random_seed(seed)
+    # before_after(config)
