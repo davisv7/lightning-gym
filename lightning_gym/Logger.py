@@ -20,9 +20,9 @@ class Logger:
         if reward_type == "pog":
             ylabel = "Percentage of Greedy"
         else:
-            ylabel = "Betweeness Improvement"
+            ylabel = "Betweenness Improvement"
         plt.ylabel(ylabel)
-        plt.title("Performance of RL Agent on MBIP")
+        plt.title("Training Performance on Random Graphs")
         plt.show()
 
     def plot_td_error(self):
