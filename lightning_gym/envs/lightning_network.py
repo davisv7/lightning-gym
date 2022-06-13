@@ -56,7 +56,8 @@ class NetworkEnvironment(Env):
         self.index_to_node = bidict()
         self.default_node_ids = ["", None, self.n]
 
-        self.reward_dict = dict()  # memoization
+        self.btwn_dict = dict()  # memoization
+        self.close_dict = dict()  # memoization
 
         # make sure a valid graph type is being used
         valid_types = ['snapshot', 'random_snapshot', 'scale_free']
@@ -94,24 +95,36 @@ class NetworkEnvironment(Env):
         :return:
         """
         weights = "cost"
-        # weights = None
-        if self.repeat:
-            key = "".join(list(map(str, self.get_recommendations())))
-            if key in self.reward_dict:
-                new_btwn = self.reward_dict[key]
-            else:
-                new_btwn = self.ig_g.betweenness(self.node_id, directed=True, weights=weights) / self.norm
-                self.reward_dict[key] = new_btwn
+        key = "".join(list(map(str, self.get_recommendations())))
+        if self.repeat and key in self.btwn_dict:
+            new_btwn = self.btwn_dict[key]
+            # new_close = self.close_dict[key]
+        elif self.repeat:
+            new_btwn = self.get_betweenness()
+            # new_close = self.get_closeness()
+            self.btwn_dict[key] = new_btwn
+            # self.close_dict[key] = new_close
         else:
-            new_btwn = self.ig_g.betweenness(self.node_id, directed=True, weights=weights) / self.norm
+            new_btwn = self.get_betweenness()
+            # new_close = self.get_closeness()
 
-        reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
-        self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
+        reward = new_btwn - self.btwn_cent
+        self.btwn_cent = new_btwn
         return reward
-        # return self.btwn_cent
 
     def get_closeness(self):
-        return self.ig_g.closeness(self.node_id, mode="in", weights="cost")
+        return self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
+
+    def get_betweenness(self):
+        return self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+
+    def get_betweennesses(self):
+        scaler = MinMaxScaler()
+        betweenness = np.array(self.ig_g.betweenness(directed=True, weights="cost"))
+        betweenness[-1] = 0
+        norm_betweenness = scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze()
+        norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
+        return norm_betweenness.squeeze().numpy().tolist()
 
     def get_recommendations(self):
         """
