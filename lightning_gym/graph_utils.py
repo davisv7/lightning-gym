@@ -2,7 +2,7 @@ import networkx as nx
 from os import path, getcwd
 import igraph as ig
 from .utils import get_random_filename
-from ln_graph_utils.ln_graph_utils import load_json
+from graph_utils import load_json
 import numpy as np
 from copy import deepcopy
 

@@ -1,8 +1,7 @@
-from ln_graph_utils.ln_graph_utils import *
+from graph_utils import *
 import os.path as path
 from os import getcwd
 from lightning_gym.utils import print_config, random_seed
-from lightning_gym.envs.lightning_network import NetworkEnvironment
 from ActorCritic import DiscreteActorCritic
 import configparser
 from lightning_gym.graph_utils import undirected, down_sample
