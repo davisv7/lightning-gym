@@ -1,6 +1,4 @@
-from graph_utils import *
 import os.path as path
-from os import getcwd
 from lightning_gym.utils import print_config, random_seed
 from ActorCritic import DiscreteActorCritic
 import configparser
