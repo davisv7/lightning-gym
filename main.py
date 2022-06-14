@@ -4,7 +4,7 @@ from os import getcwd
 from lightning_gym.utils import print_config, random_seed
 from ActorCritic import DiscreteActorCritic
 import configparser
-from lightning_gym.graph_utils import undirected, down_sample
+from lightning_gym.graph_utils import *
 from baselines import *
 import argparse
 
