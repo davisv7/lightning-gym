@@ -1,110 +1,116 @@
-from lightning_gym.envs.lightning_network import NetworkEnvironment
-import warnings
+import os.path as path
+from lightning_gym.utils import print_config, random_seed
 from ActorCritic import DiscreteActorCritic
-from lightning_gym.Logger import Logger
-
-warnings.filterwarnings("ignore")
-
-values = {
-    'budget': 10,
-    'node_id': None,
-    'num_episodes': 1000,
-    'load_model': False,
-}
+import configparser
+from lightning_gym.graph_utils import *
+from baselines import *
+import argparse
 
 
-def train_upwards():
-    budget = values['budget']
-    # node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
-    node_id = values['node_id']
-    # Initial Budget
+def create_snapshot_env(config):
+    json_filename = config["env"]["filename"]
+    ds = config.getboolean("env", "down_sample")
+    nodes, edges = load_json(path.join(getcwd(), "snapshots", json_filename))
+    key_to_alias = dict({x["pub_key"]: x["alias"] for x in nodes})
+    size_before = len(nodes), len(edges)
+    print(size_before)
+    # clean nodes
+    active_nodes = get_pubkeys(nodes)
 
-    total_reward = 0
-    num_episodes = values['num_episodes']  # Change this back to 10k
-    load_model = values['load_model']
-    entire_log = Logger()
-    start = 8
-    end = start + 1
-    for power in range(start, end):  # creating i amount of subgraphs and testing each one
-        k = 2 ** power
-        env = NetworkEnvironment(
-            budget=budget,
-            node_id=node_id,
-            k=k,
-            repeat=True,  # Change to True or False
-            graph_type='sub_graph'  # This can be changed to different graph types
-        )
-        env.r_logger = entire_log
-        ajay = DiscreteActorCritic(
-            env,
-            cuda_flag=False,
-            load_model=load_model,
-        )  # Awaken Ajay the Agent
+    # clean edges
+    edge_filters = config["edge_filters"]
+    active_edges = clean_edges(edges, edge_filters)
+    active_edges = get_channels_with_attrs(active_edges)
 
-        for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
-            log = ajay.train()
-        entire_log = log
-        load_model = True
-        ajay.save_model()  # Save model to reuse and continue to improve on it
-        print()
+    # Create graph
+    g = nx.MultiDiGraph()
+    g.add_edges_from(active_edges)
+    g = nx.MultiDiGraph(g.subgraph(active_nodes))
+    if ds:
+        g = down_sample(g, config)
 
-    print('total reward: ', env.r_logger.log['tot_reward'])
-    print("td error: ", env.r_logger.log['td_error'])
-    print("entropy: ", env.r_logger.log['entropy'])
-    env.r_logger.plot_logger()
+    # reduce graph
+    graph_filters = config["graph_filters"]
+    if graph_filters.getboolean("combine_multiedges"):
+        g = simplify_graph(g)
+    if graph_filters.getboolean("remove_bridges"):
+        g = nx.DiGraph(reduce_to_mainnet(g))
+    if graph_filters.getboolean("undirected"):
+        g = undirected(g)
+    if graph_filters.getboolean("unweighted"):
+        nx.set_edge_attributes(g, values=0.1, name='cost')
+
+    size_after = len(g.nodes()), len(g.edges()) // 2
+    print(size_after)
+
+    # create an environment, an agent, and then train for some number of episodes
+    return NetworkEnvironment(config, g=g), key_to_alias, (size_before, size_after)
 
 
-def print_prompt():
-    print("The agent will run in the enviroment with the follwing paramaters:",
-          "budget: {}".format(values['budget']),
-          "node_id: {}".format(values['node_id']),
-          "num_episodes: {}".format(values['num_episodes']),
-          "load_model: {}".format(values['load_model']), sep="\n\t")
+def main():
+    """
+    This program expects there to exist a directory containing snapshots of the lightning network stored in json format.
+    Each of these files is loaded into a graph, and the nodes and edges are filtered according to some requirements.
+    The filtered graph is then saved in another directory of 'clean' snapshots.
+    A smaller directory is created that contains a sample of 100 of the clean snapshots to be used to train the agent.
+    :return:
+    """
+    parser = argparse.ArgumentParser(description='Run  a simulation according to config.')
+    # parser.add_argument("--config", type=str, default="configs/train_snapshot.conf")
+    # parser.add_argument("--config", type=str, default="./configs/train_scale_free.conf")
+    # parser.add_argument("--config", type=str, default="configs/test_snapshot.conf")
+    parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
+    args = parser.parse_args()
+    config_loc = args.config
+
+    config = configparser.ConfigParser()
+    config.read(config_loc)
+    print_config(config)
+    seed = config["env"].getint("seed", fallback=None)
+
+    if seed:
+        random_seed(seed)
+        print("seed set")
+
+    if config["env"]["graph_type"] == "snapshot":
+        env, k_to_a, _ = create_snapshot_env(config)
+    else:
+        env = NetworkEnvironment(config)
+
+    ajay = DiscreteActorCritic(env, config)
+    # rando = RandomAgent(env)
+    # topk_btwn = TopBtwnAgent(env)
+    # topk_degree = TopDegreeAgent(env)
+    # greed = GreedyAgent(env)
+    kCenter = kCenterAgent(env)
+    # trained = TrainedGreedyAgent(env, config)
+
+    # num_episodes = config.getint("training", "episodes")
+    # for episode in range(num_episodes):
+    #     log = ajay.train()
+    #     recommendations = env.get_recommendations()
+    #     print("E: {}, R: {:.4f}, N:{}".format(episode, env.btwn_cent, recommendations))
+    # ajay.save_model()
+
+    print("Test Results:", ajay.test())
+    # print(ajay.problem.get_closeness())
+    # print(ajay.problem.get_recommendations())
+    # print([k_to_a[key] for key in ajay.problem.get_recommendations()])
+    # # print("Random Results:", rando.run_episode())
+    # print("TopK Results:", topk_btwn.run_episode())
+    # print(topk_btwn.problem.get_closeness())
+    # print(topk_btwn.problem.get_recommendations())
+    # print([k_to_a[key] for key in topk_btwn.problem.get_recommendations()])
+    # print("TopK Degree Results:", topk_degree.run_episode())
+    # print("Trained Greedy Results:", trained.run_episode())
+    print("kCenter Results:", kCenter.run_episode())
+    # # print("Greed Results:", greed.run_episode())
+    # print('total reward: ', ajay.logger.log['tot_reward'])
+    # print("td error: ", ajay.logger.log['td_error'])
+    # print("entropy: ", ajay.logger.log['entropy'])
+    # ajay.logger.plot_reward()
+    # ajay.logger.plot_td_error()
 
 
 if __name__ == '__main__':
-    print_prompt()
-    train_upwards()
-
-# warnings.filterwarnings("ignore")
-#
-# budget = 10
-# # node_id = "038f8302141b9b5e53d239578d8ee0699d4a3cb852f6e93ec43bdee7eebd115bef"
-# node_id = None
-# # Initial Budget
-#
-# total_reward = 0
-#
-# for i in range(6, 7): #creating i amount of subgraphs and testing each one
-#     k = 2 ** i
-#     #
-#     env = NetworkEnvironment(
-#         budget=budget,
-#         node_id=node_id,
-#         # k=k,
-#         repeat=True
-#     )  # Create class instance
-#     ajay = DiscreteActorCritic(env, cuda_flag=False, load_model=False)#activate ajay
-#     for i in range(1000): #for each i in range of 10, training i amount of ajay
-#         log = ajay.train()
-#         # ajay.save_model()ds
-#     ajay.save_model() #save model to reuse and continue to improve on it
-#     print()
-#
-# print(env.r_logger.log)
-# env.r_logger.plot_logger()
-#     #
-#     # ajay.save_model()
-#     # print()
-#
-#
-# # obs = env.reset()
-# # for i in range(budget):  # Iterate each int for our budget range
-# #     action, _states = model.predict(obs)
-# #     state, reward, done, _ = env.step(action)  # Make the envrioment take that step
-# #     total_reward += reward  # Update the reward
-# #     print('Action', action)
-# #     print(
-# #         f"by adding node {env.index_to_node[action]},"
-# #         f" our betweenness centrality by {reward:.5f} for a total of {total_reward}")
-# #     print(state.shape, '\n')
+    main()

@@ -1,91 +1,66 @@
-import networkx as nx
 from gym import Env
-import numpy as np
 from bidict import bidict
-from ..utils import *
 import dgl
 import torch
-import random
-from ..Logger import Logger
-from random import shuffle
-from copy import deepcopy
-import matplotlib.pyplot as plt
 from ..graph_utils import *
-from functools import reduce
-
-'''
-    Get the current directory.
-    Join the current directory with the name of file. Sample_Snapshots
-'''
+from os import getcwd, path
+from sklearn.preprocessing import MinMaxScaler
+from igraph import Graph as iGraph
 
 CWD = getcwd()
 SAMPLEDIRECTORY = path.join(CWD, 'sample_snapshots')
-
-"""
-Reinforcement Learning Formulation
-
-State:
-a state S is a sequence of actions (nodes) on graph G, 
-nodes are represented by their embeddings so the state vector is p-dimensional
-
-Transition:
-tag nodes selected as asction x_v=1 x_v is feature x of node v
-
-Actions:
-action v is a node in graph G that is not part of s
-actions are nodes represented by their embeddings
-
-Rewards:
-r(S,v) = c(h(S'),G)-c(h(S),G) 
-reward of taking action v in state S is the change in betweenness after adding v to S
-
-Policy:
-pi(v|S) := argmax_(v' in S^bar)(Q_hat(h(S),v')
-"""
 
 
 # Environment Class
 class NetworkEnvironment(Env):
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, g=None):
         """
-        :param
-        budget: number of channels that can add to graph
-        node_index: node parameter that want to test on
-        ig_g: igraph graph
-        dgl_g: dgl graph
-        btwn_cent: betweeness centrality
-        edge_vector: neighbors of a node, (1=neighbor, 0=not neighbor)
-        features: betweeness, degree, closeness, edge vector
-        r_logger: keeps track of reward
-        repeat: whether or not to repeat
-        budget_offset: how many edges the nodes started off with
-        nx_graph: networkX graph
-        k: size of subgraph
-        params = kwards: pass keywords
+        Initializes NetworkEnvironment
+        :param config: contains config variables related to the agent and environment
+        :param g: optional argument to pass a graph instead of randomly generating one.
         """
         self.budget = config.getint("env", "budget")
         self.node_id = config.get("env", "node_id")
         self.repeat = config.getboolean("env", "repeat")
         self.graph_type = config.get("env", "graph_type")
+        self.filename = config.get("env", "filename", fallback=None)
+        self.cutoff = config.getint("env", "cutoff")
+        self.n = config.getint("env", "n", fallback=None)
+        self.config = config
 
-        self.index_to_node = bidict()
-        self.r_logger = Logger()
-        self.node_index = None
-        self.ig_g = None
-        self.dgl_g = None
-        self.graph_size = None
-        self.btwn_cent = 0
-        self.node_vector = None
-        self.features = None
-        self.budget_offset = 0
+        # graphs
+        self.base_graph = g
         self.nx_graph = None
-        self.base_graph = None
-        self.norm = None
+        self.ig_g: iGraph
+        self.dgl_g = None
+
+        # useful attributes if node_id is not default
+        self.budget_offset = 0
+        self.action_mask = None
+        self.preexisting_neighbors = None
+
+        # features
+        # self.costs = None
+        self.e_btwns = None
+        self.node_features = None
+
+        # related to game state
+        self.node_vector = None
+        self.btwn_cent = 0
         self.num_actions = 0
-        self.actions_taken = []
-        self.k = kwargs.get("k", None)
-        valid_types = ['sub_graph', 'snapshot', 'scale_free']
+
+        self.node_index = None
+        self.graph_size = None
+        self.norm = None
+        self.index_to_node = bidict()
+        self.default_node_ids = ["", None, self.n]
+
+        self.btwn_dict = dict()  # memoization
+        self.close_dict = dict()  # memoization
+
+        # make sure a valid graph type is being used
+        valid_types = ['snapshot', 'random_snapshot', 'scale_free']
         assert self.graph_type in valid_types, "\nYou must use one of the following graphs types:\n\t{}".format(
             ',\n\t'.join(valid_types))
 
@@ -97,234 +72,297 @@ class NetworkEnvironment(Env):
               Graph Type: {}
               Repeat State: {}""".format(self.budget, self.node_id, self.graph_type, self.repeat)
 
-    def get_features(self):
-        '''
-        Initialize Algorithm
-        Measures the extent to which a node lies on shortest
-        paths between other nodes. Nodes with high betweeness
-        could have considerable more influence.
-        '''
-        weights = self.ig_g.es["weight"]
-        # norm = (self.graph_size * (self.graph_size - 1) / 2)
-        # w_norm = sum(weights)
-        indices = self.ig_g.vs().indices
-        # b_centralities = np.array(self.ig_g.betweenness(indices, weights=weights)) / norm
-        # b_centralities = torch.Tensor(b_centralities).unsqueeze(-1)  # makes list smaller size
+    def get_illegal_actions(self):
+        """
+        A node is illegal if the agent is already connected to that node, or if it is masked by the action mask
+        :return:
+        """
+        illegal = ((self.node_vector + self.action_mask + self.preexisting_neighbors) > 0.).nonzero()
+        return illegal
 
-        '''Initialize Algorithm
-        Indicates how close a node is to all other nodes in the network. 
-        '''
-        # dc = np.zeros(shape=self.graph_size)
-        # for i, node in enumerate(self.ig_g.vs()):
-        #     incident_weights = self.ig_g.es.select(_source=[node])["weight"]
-        #     dc[i] = sum(incident_weights) / w_norm
+    def get_legal_actions(self):
+        """
+        A node is legal if the agent is not already connected to that node, and if it is not masked by the action mask
+        :return:
+        """
+        legal = ((self.node_vector + self.action_mask + self.preexisting_neighbors) == 0.).nonzero()
+        return legal
 
-        # d_centralities = torch.Tensor(dc).unsqueeze(-1)
+    def get_reward(self):
+        """
+        Reward here is defined as the change in betweenness centrality of node_id.
+        Could also be represented by the betweenness of the most recently added edge.
+        :return:
+        """
+        weights = "cost"
+        key = "".join(list(map(str, self.get_recommendations())))
+        if self.repeat and key in self.btwn_dict:
+            new_btwn = self.btwn_dict[key]
+            # new_close = self.close_dict[key]
+        elif self.repeat:
+            new_btwn = self.get_betweenness()
+            # new_close = self.get_closeness()
+            self.btwn_dict[key] = new_btwn
+            # self.close_dict[key] = new_close
+        else:
+            new_btwn = self.get_betweenness()
+            # new_close = self.get_closeness()
 
-        cc = self.ig_g.closeness(indices, weights=weights)
-        c_centralities = torch.Tensor(cc).unsqueeze(-1).nan_to_num(0)
+        reward = new_btwn - self.btwn_cent
+        self.btwn_cent = new_btwn
+        return reward
 
-        lc = nx.load_centrality(undirected(self.nx_graph))
-        l_centralities = torch.Tensor([lc[node["name"]] for node in self.ig_g.vs()]).unsqueeze(-1)
+    def get_closeness(self):
+        return self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
 
-        'appending 3 features in a tensor'
-        self.features = torch.cat((
-            # b_centralities,
-            # d_centralities,
-            c_centralities,
-            l_centralities,
-            self.node_vector.unsqueeze(-1)), dim=1)
-        self.dgl_g.ndata['features'] = self.features  # pass down features to dgl
+    def get_betweenness(self):
+        return self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
 
-    def step(self, action: int):  # make action and give reward
+    def get_betweennesses(self):
+        scaler = MinMaxScaler()
+        betweenness = np.array(self.ig_g.betweenness(directed=True, weights="cost"))
+        betweenness[-1] = 0
+        norm_betweenness = scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze()
+        norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
+        return norm_betweenness.squeeze().numpy().tolist()
+
+    def get_recommendations(self):
+        """
+        Returns a sorted list of recommendations as indicated by actions_taken.
+        :return:
+        """
+        actions_taken = (self.node_vector == 1).nonzero()
+        return sorted([self.index_to_node[index.item()] for index in actions_taken])
+
+    def step(self, action: int, no_calc=False):
+        """
+        Update graph, node_vector, reward, and done using action
+        :param no_calc: if test is true there is no need to calc betweenness until the budget is exhausted
+        :param action: index representing node being connected to
+        :return:
+        """
         done = False
+        reward = 0
         if self.node_vector[action] == 1:  # if find neighbor = no reward (don't need node)
             '''
             right now, selecting na index twice doesnt do anything
             what if selecting an index twice removed the channel? increment budget, reward is negative change
             '''
-            # reward = 0
             self.node_vector[action] = 0  # mark channel for deletion
             self.take_action(action, remove=True)
-            # reward = 1.01 * self.get_reward()
+            if not no_calc:
+                reward = self.get_reward()
         else:
-            # reward = 0
             self.node_vector[action] = 1  # mark as explored in edge vector
             self.take_action(action)
-            reward = self.get_reward()
+            if not no_calc:
+                reward = self.get_reward()
 
-        if self.num_actions == self.budget + self.budget_offset:  # check if exhausted budget
-            # self.get_reward()
-            # reward = self.btwn_cent
+        if self.num_actions == self.budget + self.budget_offset:  # check if budget has been exhausted
             done = True
-            self.r_logger.add_log('tot_reward', self.btwn_cent)
         info = {}
         reward = torch.Tensor([reward])
-        return self.dgl_g, reward, done, info  # Tensor so we can take it and appending
-
-    def get_illegal_actions(self):  # tells Ajay to not look at neighbors as an action
-        illegal = (self.node_vector == 1.).nonzero()  # if neighbor of node = illegal
-        legal = (self.node_vector == 0.).nonzero()
-        return illegal, legal
-
-    def get_reward(self):  # if add node, what is the betweeness centrality?
-        new_btwn = -self.ig_g.betweenness(self.node_id, weights=self.ig_g.es["weight"]) / self.norm
-        # new_btwn = self.get_triangles()
-        reward = new_btwn - self.btwn_cent  # how much improve between new & old btwn cent
-        self.btwn_cent = new_btwn  # updating btwn cent to compare on next node
-        return reward
-
-    def get_triangles(self):
-        triangles = 0
-        incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_index])]
-        if incident_edges:
-            nbrs = np.unique(reduce(lambda x, y: x + y, incident_edges))
-            nbrs = nbrs[nbrs != self.node_index]
-            nbrsnbrs = self.ig_g.es.select(_between=(nbrs, nbrs))
-            triangles = len(nbrsnbrs)
-        return -triangles
+        return self.dgl_g, reward, done, info
 
     def take_action(self, action, remove=False):
+        """
+        Actually take the action by adding or removing the edge between the action node and our node
+        :param action: index representing node being connected to
+        :param remove: boolean value indicating whether the edge should be added or removed
+        :return:
+        """
         neighbor_index = action
         neighbor_id = self.index_to_node[neighbor_index]
         if remove:
             self.ig_g.delete_edges((neighbor_id, self.node_id))
-            self.features[action, -1] = 0
+            self.ig_g.delete_edges((self.node_id, neighbor_id))
+            # self.dgl_g.remove_edges(torch.tensor([neighbor_index, self.node_index]))
+            edge_ids = [self.dgl_g.edge_ids(self.node_index, neighbor_index),
+                        self.dgl_g.edge_ids(neighbor_index, self.node_index)]
+            self.dgl_g.remove_edges(torch.tensor(edge_ids))
+            self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:
-            self.ig_g.add_edge(neighbor_id, self.node_id, weight=0.001)
-            self.features[action, -1] = 1
+            self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
+            self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)
+            self.dgl_g.add_edges(torch.tensor([neighbor_index, self.node_index]),
+                                 torch.tensor([self.node_index, neighbor_index]))
+            self.node_features[action, -1] = 1
             self.num_actions += 1
 
-        self.dgl_g.ndata['features'] = self.features
-        self.actions_taken.append(action)
+        self.dgl_g.ndata['features'] = self.node_features
+
+    def load_graph(self):
+        if self.graph_type == 'snapshot':
+            if self.base_graph is not None:
+                self.nx_graph = deepcopy(self.base_graph)
+            elif self.filename:
+                self.nx_graph = get_snapshot(self.filename)
+
+            if self.node_id not in self.default_node_ids:
+                self.index_to_node = bidict(enumerate(sorted(self.nx_graph.nodes())))
+                self.node_index = self.index_to_node.inverse[self.node_id]
+            else:
+                self.add_node("")
+        elif self.graph_type == 'scale_free':
+            self.nx_graph = random_scale_free(self.n)
+            # print(len(self.nx_graph.nodes()), len(self.nx_graph.edges()))
+            self.add_node(self.n)
+
+        # Create bidictionary = tuple index: pubKey
+        self.index_to_node = bidict(enumerate(sorted(self.nx_graph.nodes())))
+
+        self.base_graph = deepcopy(self.nx_graph)
 
     def reset(self):
-        if self.repeat and self.base_graph is not None:
-            # reload
-            self.nx_graph = deepcopy(self.base_graph)
+        # reset graph
+        if self.repeat and self.nx_graph is not None:
+            self.nx_graph = deepcopy(self.base_graph)  # reload
         else:
-            if self.graph_type == 'snapshot':
-                self.nx_graph = get_random_snapshot()
-                if self.node_id not in ["", None, self.k]:
-                    self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
-                    self.node_index = self.index_to_node.inverse[self.node_id]
-                else:
-                    self.add_node("")
-            elif self.graph_type == 'sub_graph':
-                self.nx_graph = get_random_snapshot()
-                self.generate_subgraph()
-                self.add_node("")
-            elif self.graph_type == 'scale_free':
-                self.nx_graph = random_scale_free(self.k)
-                self.add_node(self.k)
+            self.load_graph()
 
-            self.graph_size = len(self.nx_graph.nodes())
-
-            # Create bidictionary = tuple index: pubKey
-            self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
-
-            if self.repeat:
-                self.base_graph = deepcopy(self.nx_graph)
-
-        # convert nx_graph for gcn and metrics
+        # create dgl graph and igraph from nx_graph
         self.ig_g = nx_to_ig(self.nx_graph)
-        self.dgl_g = dgl.from_networkx(self.nx_graph.to_undirected()).add_self_loop()
-        # self.dgl_g = dgl.from_networkx(self.nx_graph,edge_attrs=['weight']).add_self_loop()
+        self.dgl_g = dgl.from_networkx(self.nx_graph).add_self_loop()
+        self.norm = (self.graph_size - 1) * (self.graph_size - 2)
+
+        # reset edge attribute: cost
+        # self.costs = self.ig_g.es["cost"]
+        # cost_sum = np.sum(self.costs)
+        # cost_mean = cost_sum / len(self.costs)
+        # self.costs = self.costs / cost_mean
+        # self.costs = torch.Tensor(self.costs).unsqueeze(-1)
 
         self.budget_offset = 0
-        self.get_edge_vector_from_node()
+        self.node_vector = torch.zeros(self.graph_size)
+        self.update_neighbor_vector()
+        self.update_node_features()
+        self.update_action_mask()
 
         self.num_actions = 0
-        self.actions_taken = []
-
-        self.get_features()
-
-        weights = self.ig_g.es["weight"]
-        self.norm = (self.graph_size * (self.graph_size - 1) / 2)
-        self.w_norm = sum(weights)
-        self.btwn_cent = -self.ig_g.betweenness(self.node_id, weights=weights) / self.norm
-        # self.btwn_cent = self.get_triangles()
+        if self.budget_offset < 2:
+            self.btwn_cent = 0
+        else:
+            self.btwn_cent = 0
+            self.btwn_cent = self.get_reward()
         return self.dgl_g
 
-    def draw_graph(self):
-        if self.graph_type == 'snapshot':
-            nx.draw(self.nx_graph,
-                    node_color='blue',
-                    edge_color='yellow',
-                    node_size=150,
-                    node_shape='.'
-                    )
-            plt.show()
+    def update_neighbor_vector(self):
+        """
+        Populate our preexisting neighbor vector with nodes our node is already adjacent to. Update the budget offset.
+        :return:
+        """
+        self.preexisting_neighbors = torch.zeros(self.graph_size)
+        # if self.preexisting_neighbors is None or not self.repeat:
+        #     if self.node_id not in self.default_node_ids:
+        #         incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
+        #         if incident_edges:
+        #             vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
+        #             vertices = vertices[vertices != self.node_index].type(torch.long)
+        #             self.preexisting_neighbors = self.preexisting_neighbors.put(vertices, torch.ones(len(vertices)))
+        #             self.budget_offset = len(vertices)
 
-        elif self.graph_type == 'sub_graph':
-            nx.draw(self.nx_graph,
-                    node_color='red',
-                    edge_color='green',
-                    node_size=150,
-                    node_shape='h'
-                    )
-            plt.show()
+    def update_node_features(self):
+        """
+        Assigns to each node a feature vector containing including but not limited to:
+        closeness centrality: the average cost to send funds to/from this node from/to other nodes in the network
+        degree centrality: the fraction of edges incident to the node relative to the total number of edges
+        load centrality: similar to betweenness centrality, except it only considers one cheapest path versus all
+        strengths: sum of out weights divided the max of the sum of these out weights
+        node vector: 0-1 vector indicating which nodes the agent is adjacent to
+        :return:
+        """
+        scaler = MinMaxScaler()
+        # possible predictors: degree,betweenness,eigenness,closeness,inclusion
+        if self.node_features is not None and self.repeat:
+            j = torch.arange(self.node_features.size(0)).long()
+            self.node_features[j, -1] = self.node_vector
+        else:
+            # degrees = np.array(self.ig_g.strength(mode="in"))
+            # norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
+            # norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
+            #
+            # eigenness = np.array(self.ig_g.eigenvector_centrality(directed=True, scale=True, weights="cost"))
+            # eigenness[-1] = 0
+            # norm_eigenness = scaler.fit_transform(eigenness.reshape(-1, 1)).squeeze()
+            # norm_eigenness = torch.Tensor(norm_eigenness).unsqueeze(-1)
+            #
+            # closeness = np.array(self.ig_g.closeness(mode="out", weights="cost"))
+            # closeness[-1] = 0
+            # norm_closeness = scaler.fit_transform(closeness.reshape(-1, 1)).squeeze()
+            # norm_closeness = torch.Tensor(norm_closeness).unsqueeze(-1)
+            #
+            # betweenness = np.array(self.ig_g.betweenness(directed=True, weights="cost"))
+            # betweenness[-1] = 0
+            # norm_betweenness = 1 - (scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze())
+            # norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
+            #
+            # self.node_features = torch.cat((
+            #     norm_degrees,
+            # norm_closeness,
+            # norm_betweenness,
+            # norm_eigenness,
+            # self.node_vector.unsqueeze(-1)
+            # ), dim=1)
+            self.node_features = self.node_vector.unsqueeze(-1)
 
-        elif self.graph_type == 'scale_free':
-            nx.draw(self.nx_graph,
-                    node_color='purple',
-                    edge_color='pink',
-                    with_labels=True,
-                    node_size=150,
-                    node_shape='h'
-                    )
-            plt.show()
+        self.dgl_g.ndata['features'] = self.node_features
 
-    def get_edge_vector_from_node(self):
-        # Create a vector of zeros to the length of the graph_size
-        self.node_vector = torch.zeros(self.graph_size)
-
-        if self.node_id is not None:
-            # for edge in self.nx_graph.edges():  # trying to find neighbors of node
-            #     if edge[0] == self.node_id:
-            #         neighbor_index = self.index_to_node.inverse[edge[1]]
-            #         self.edge_vector[neighbor_index] = 1
-            #         self.budget_offset += 1  # update budget, discount if have neighbor
-            incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_index])]
-            if incident_edges:
-                vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
-                vertices = vertices[vertices != self.node_index].type(torch.long)
-                self.node_vector = self.node_vector.put(vertices, torch.ones(len(vertices)))
-                self.budget_offset = len(vertices)
-
-        return self.node_vector
-
-    def generate_subgraph(self):
-        if self.k >= len(self.nx_graph):
-            return self.nx_graph
-
-        included_nodes = set()
-        excluded_nodes = set(self.nx_graph.nodes())  # excluded= nodes already found
-        unexplored_neighbors = set()  # empty set of unexplored neighbors = k doesnt allow to explore neighbor
-
-        node = random.choice(list(excluded_nodes))  # Take a random node to start BFS=breadth first search
-        excluded_nodes.difference_update([node])  # Take node from non-explored
-        included_nodes.add(node)  # Add node in visited nodes
-        while len(included_nodes) < self.k:
-            neighbors = list(self.nx_graph.neighbors(node))  # Get all the neighbors from the node
-            shuffle(neighbors)  # Make the nodes random
-            # shorten neighbors so that subgraph stays below k
-            cutoff = min(self.k - len(included_nodes), len(neighbors))  # If enough space, add n if not until is filled
-            neighbors = set(neighbors[:cutoff])  # Get the nodes up to
-
-            unexplored_neighbors = unexplored_neighbors.union(
-                neighbors - included_nodes)  # Add cutoff = unexplored neighbors
-            included_nodes = included_nodes.union(neighbors)  # Add return n into included nodes
-            excluded_nodes.difference_update(neighbors)  # Take out the neighbors
-            node = random.choice(list(unexplored_neighbors))  # Choose a random node from unexplored neighbors
-            unexplored_neighbors.difference_update([node])  # Remove that node from unexplored
-        self.nx_graph = nx.DiGraph(nx.subgraph(self.nx_graph, included_nodes))  # return networkx graph
+    def update_action_mask(self):
+        """
+        Creates an action mask according to some constraints. Such constraints can include but are not limited to:
+            minimum degree
+            minimum average capacity per channel
+            minimum reliability
+            minimum edge betweenness
+        If a node is in the action mask, it is deemed an illegal move and will not be taken by the agent.
+        :return:
+        """
+        self.action_mask = np.zeros(self.graph_size)
+        self.action_mask[self.index_to_node.inverse[self.node_id]] = 1  # make sure we cannot select our own node
+        # if self.action_mask is None or not self.repeat:
+        #     if self.graph_type == "scale_free":
+        #         self.action_mask = np.zeros(self.graph_size)
+        #     else:
+        #         candidate_filters = self.config["action_mask"]
+        #         self.action_mask = np.zeros(self.graph_size)
+        #         min_degree = candidate_filters.getint("minimum_channels", 0)
+        #         min_avg_cap = candidate_filters.getint("min_avg_capacity", 0)
+        #         # min_reliability = candidate_filters.getfloat("min_reliability", None)
+        #         # min_btwn = candidate_filters.getfloat("min_betweenness", 0)
+        #
+        #         for i, node in enumerate(self.nx_graph.nodes()):
+        #             if node in self.default_node_ids:
+        #                 continue
+        #
+        #             degree = self.nx_graph.degree(node)
+        #             if degree < min_degree:
+        #                 self.action_mask[i] = 1
+        #                 continue
+        #
+        #             incident_capacities = [self.nx_graph[node][n]["capacity"] for n in self.nx_graph.neighbors(node)]
+        #             total_capacity = sum(incident_capacities)
+        #             avg_capacity = total_capacity / degree
+        #
+        #             if avg_capacity < min_avg_cap:
+        #                 self.action_mask[i] = 1
+        #                 continue
+        #             # elif self.features[i][0] / self.norm == min_btwn:
+        #             #     self.action_mask[i] = 1
+        #             # if min_reliability:
+        #             #     reliability = get_reliability(node)
+        #             #     if reliability < min_reliability:
+        #             #         action_mask[i] = 1
+        #             #         continue
 
     def add_node(self, node_id):
-        self.node_id = node_id
-        self.node_index = len(self.nx_graph)
-        self.nx_graph.add_node(self.node_id)
-
-    def get_recommendations(self):
-        return sorted([self.index_to_node[index] for index in self.actions_taken])
+        """
+        Add node with node_id to the nx_graph, if it has not already been added.
+        :param node_id:
+        :return:
+        """
+        if node_id not in self.nx_graph.nodes():
+            self.node_id = node_id
+            self.node_index = len(self.nx_graph.nodes())
+            self.nx_graph.add_node(self.node_id)
+            self.graph_size = len(self.nx_graph.nodes())

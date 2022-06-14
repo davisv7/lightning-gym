@@ -4,45 +4,55 @@ from ActorCritic import DiscreteActorCritic
 from lightning_gym.Logger import Logger
 from lightning_gym.utils import plot_apsp
 import configparser
+from lightning_gym.utils import random_seed
+from baselines import TrainedGreedyAgent, kCenterAgent
+import pandas as pd
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
 
+def get_pog(env, config, last_reward):
+    old_setting = env.repeat
+    env.repeat = True
+    greedy = TrainedGreedyAgent(env, config)
+    g_reward = greedy.run_episode()
+    env.repeat = old_setting
+    return round(last_reward / g_reward, 4)
+
+
+def train_agent(config, pog=False):
+    env = NetworkEnvironment(config)
+    ajay = DiscreteActorCritic(env, config)
+    log = None
+    verbose = config.getboolean("training", "verbose")
+    for episode in range(config.getint("training", "episodes")):
+        log = ajay.train()
+        last_reward = ajay.problem.get_betweenness()
+        if pog:
+            pog = get_pog(env, config, last_reward)
+            log.add_log("pog", pog)
+            last_reward = pog
+        recommendations = env.get_recommendations()
+        if verbose:
+            print("E: {}, S: {}, R: {:.4f}, N:{}".format(episode,
+                                                         env.n,
+                                                         last_reward,
+                                                         recommendations))
+    ajay.save_model()  # Save model to reuse and continue to improve on it
+    return log
+
+
 def train_upwards(config):
-    entire_log = Logger()
-    start = 9
-    end = start + 2
-    num_episodes = 100
+    logs = []
+    start = 4
+    end = start + 5
     for power in range(start, end):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
-        env = NetworkEnvironment(config, k=k)
-        env.r_logger = entire_log
-        ajay = DiscreteActorCritic(env, config)  # Awaken Ajay the Agent
-
-        for episode in range(num_episodes):  # For each x in range of num_episodes, training x amount of Ajay
-            log = ajay.train()
-            recommendations = env.get_recommendations()
-            print("E: {}, S: {}, R: {:.4f}, N:{}".format(episode, k, log.log['tot_reward'][-1], recommendations))
-        entire_log = log
-        ajay._load_model = True
-        ajay.save_model()  # Save model to reuse and continue to improve on it
-        print()
-
-    print('total reward: ', env.r_logger.log['tot_reward'])
-    print("td error: ", env.r_logger.log['td_error'])
-    print("entropy: ", env.r_logger.log['entropy'])
-    env.r_logger.plot_logger()
-
-
-def before_after(k=1000, load_model=True):
-    env = NetworkEnvironment(config, k=k)
-
-    ajay = DiscreteActorCritic(env, config)
-    env.reset()
-    plot_apsp(env.nx_graph)
-    log = ajay.test()
-    print("E: 1, S: {}, R: {:.2f}".format(k, log.log["tot_reward"][-1]))
-    plot_apsp(env.nx_graph)
+        config["env"]["n"] = str(k)
+        log = train_agent(config)
+        logs.append(log)
+        config["agent"]["load_model"] = "True"
 
 
 def print_config(config):
@@ -54,7 +64,26 @@ def print_config(config):
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()
-    print(config.read("config.conf"))
+    config_loc = "./configs/train_scale_free.conf"
+    config.read(config_loc)
     print_config(config)
-    train_upwards(config)
+    seed = config["env"].getint("seed", fallback=None)
+    if seed:
+        random_seed(seed)
+    pog = True
+    # train_upwards(config)
+    log = train_agent(config, pog=pog)
     # before_after()
+    if pog:
+        log.plot_reward(reward_type="pog")
+    else:
+        log.plot_reward()
+
+    # config = configparser.ConfigParser()
+    # config_loc = "./configs/test_scale_free.conf"
+    # config.read(config_loc)
+    # print_config(config)
+    # seed = config["env"].getint("seed", fallback=None)
+    # if seed:
+    #     random_seed(seed)
+    # before_after(config)
