@@ -24,7 +24,7 @@ class TopBtwnAgent:
             # take action
             _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
         self.problem.get_reward()
-        return self.problem.btwn_cent
+        return self.problem.get_betweenness()
 
     def compute_betweenness(self):
         # cost = None
@@ -58,7 +58,7 @@ class GreedyAgent:
             # take action
             _, _, done, _ = self.problem.step(action)  # Take action and find outputs
         self.problem.get_reward()
-        return self.problem.btwn_cent
+        return self.problem.get_betweenness()
 
     def pick_greedy_action(self):
         legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
@@ -98,7 +98,7 @@ class RandomAgent:
             # take action
             _, _, done, _ = self.problem.step(action.item(), no_calc=True)  # Take action and find outputs
         self.problem.get_reward()
-        return self.problem.btwn_cent
+        return self.problem.get_betweenness()
 
     def pick_random_action(self):
         legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
@@ -135,7 +135,7 @@ class TrainedGreedyAgent:
             _, _, done, _ = self.problem.step(action, no_calc=no_calc)  # Take action and find outputs
         self.problem.get_reward()
         # print(self.problem.btwn_cent, self.problem.get_recommendations())
-        return self.problem.btwn_cent
+        return self.problem.get_betweenness()
 
     def pick_greedy_action(self, G):
         illegal_actions = self.problem.get_illegal_actions().squeeze().detach().numpy()
@@ -155,16 +155,14 @@ class TrainedGreedyAgent:
         if self.problem.num_actions + self.problem.budget_offset < 2 or self.n == 1:
             best_action = self.predict_action(pi, illegal_actions, 1).item()
         else:
-            best_reward = -1
+            best_btwn = -1
             predicted_actions = list(set(map(lambda x: x.item(), self.predict_action(pi, illegal_actions, self.n))))
             for a in predicted_actions:
-                _, reward, _, _ = self.problem.step(a)
-                reward = reward.item()
-                self.problem.btwn_cent -= reward
-                _, _, _, _ = self.problem.step(a, no_calc=True)
-                if reward > best_reward:
+                _, _, _, _ = self.problem.step(a)
+                if self.problem.get_betweenness() > best_btwn:
                     best_action = a
-                    best_reward = reward
+                    best_btwn = self.problem.get_betweenness()
+                _, _, _, _ = self.problem.step(a, no_calc=True)
 
         return best_action
 
@@ -203,7 +201,7 @@ class TopDegreeAgent:
             # take action
             _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
         self.problem.get_reward()
-        return self.problem.btwn_cent
+        return self.problem.get_betweenness()
 
     def compute_degrees(self):
         degrees = self.problem.ig_g.degree()
@@ -237,7 +235,7 @@ class kCenterAgent:
             # take action
             _, _, done, _ = self.problem.step(action, no_calc=True)  # Take action and find outputs
         self.problem.get_reward()
-        return self.problem.btwn_cent
+        return self.problem.get_betweenness()
 
     def compute_degrees(self):
         degrees = self.problem.ig_g.degree()
