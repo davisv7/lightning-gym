@@ -51,7 +51,8 @@ def get_snapshot(filename):
 
 
 def random_scale_free(k):
-    return nx.DiGraph(nx.scale_free_graph(k, 0.8, 0.1, 0.1))
+    return nx.scale_free_graph(k, 0.8, 0.1, 0.1)
+    # return nx.DiGraph(nx.scale_free_graph(k, 0.8, 0.1, 0.1))
 
 
 def nx_to_ig(nx_graph, add_self_loop=True):
