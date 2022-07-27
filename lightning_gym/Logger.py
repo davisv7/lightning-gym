@@ -10,6 +10,10 @@ class Logger:
     def add_log(self, log_type, val):
         self.log[log_type].append(val)
 
+    def extend_log(self, log):
+        for key in log.log.keys():
+            self.log[key].extend(log.log[key])
+
     def get_last_reward(self):
         return self.log["tot_reward"][-1]
 
