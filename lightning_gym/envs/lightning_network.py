@@ -48,6 +48,7 @@ class NetworkEnvironment(Env):
         # related to game state
         self.node_vector = None
         self.btwn_cent = 0
+        self.close_cent = 0
         self.num_actions = 0
 
         self.node_index = None
@@ -94,29 +95,34 @@ class NetworkEnvironment(Env):
         Could also be represented by the betweenness of the most recently added edge.
         :return:
         """
-        weights = "cost"
-        key = "".join(list(map(str, self.get_recommendations())))
-        if self.repeat and key in self.btwn_dict:
-            new_btwn = self.btwn_dict[key]
-            # new_close = self.close_dict[key]
-        elif self.repeat:
-            new_btwn = self.get_betweenness()
-            # new_close = self.get_closeness()
-            self.btwn_dict[key] = new_btwn
-            # self.close_dict[key] = new_close
-        else:
-            new_btwn = self.get_betweenness()
-            # new_close = self.get_closeness()
+        # old_btwn = self.btwn_cent
+        new_btwn = self.get_betweenness()
+        # reward = new_btwn - old_btwn
+        reward = new_btwn
 
-        reward = new_btwn - self.btwn_cent
-        self.btwn_cent = new_btwn
+        # reward = new_close
+        # reward = new_close - self.close_cent
         return reward
 
     def get_closeness(self):
-        return self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
+        self.close_cent = self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
+        return self.close_cent
 
     def get_betweenness(self):
-        return self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+        key = "".join(list(map(str, self.get_recommendations())))
+        if self.repeat and key in self.btwn_dict:
+            self.btwn_cent = self.btwn_dict[key]
+            # new_close = self.close_dict[key]
+        elif self.repeat:
+            self.btwn_cent = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+            self.btwn_dict[key] = self.btwn_cent
+            # new_close = self.get_closeness()
+            # self.close_dict[key] = new_close
+        elif self.num_actions + self.budget_offset < 2:
+            self.btwn_cent = 0
+        else:
+            self.btwn_cent = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+        return self.btwn_cent
 
     def get_betweennesses(self):
         scaler = MinMaxScaler()
@@ -240,11 +246,8 @@ class NetworkEnvironment(Env):
         self.update_action_mask()
 
         self.num_actions = 0
-        if self.budget_offset < 2:
-            self.btwn_cent = 0
-        else:
-            self.btwn_cent = 0
-            self.btwn_cent = self.get_reward()
+        self.btwn_cent = self.get_betweenness()
+        self.close_cent = self.get_closeness()
         return self.dgl_g
 
     def update_neighbor_vector(self):
@@ -253,6 +256,8 @@ class NetworkEnvironment(Env):
         :return:
         """
         self.preexisting_neighbors = torch.zeros(self.graph_size)
+        # neighborhood = self.ig_g.neighborhood(vertices=[self.node_index], order=1)
+        # self.preexisting_neighbors[neighborhood] = 1
         # if self.preexisting_neighbors is None or not self.repeat:
         #     if self.node_id not in self.default_node_ids:
         #         incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
@@ -354,6 +359,11 @@ class NetworkEnvironment(Env):
         #             #     if reliability < min_reliability:
         #             #         action_mask[i] = 1
         #             #         continue
+
+    def get_neighborhood(self, order):
+        # also add neighborhood to action mask
+        neighborhood = self.ig_g.neighborhood(vertices=[self.node_index], order=order, mode="all", mindist=1)
+        return neighborhood
 
     def add_node(self, node_id):
         """
