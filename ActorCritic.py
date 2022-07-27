@@ -64,8 +64,9 @@ class DiscreteActorCritic:
                 G.ndata['features'] = G.ndata['features'].cuda()
 
             # convolve our graph
-            costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
-            # costs = -np.array(self.problem.ig_g.es()["cost"])
+            costs = np.array(self.problem.ig_g.es()["cost"])
+            costs = 1 / (costs + 1)
+            # costs = -np.array(costs)
             costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
             # costs = 1 - costs
             costs = torch.Tensor(costs).unsqueeze(-1)
@@ -104,6 +105,10 @@ class DiscreteActorCritic:
         return PI, R, V
 
     def predict_action(self, pi, illegal_actions):
+        # neighborhood = self.problem.get_neighborhood(2)
+        # pi[neighborhood] *= 0.9  # Whenever actor is trying to find policy distribution
+        # neighborhood = self.problem.get_neighborhood(3)
+        # pi[neighborhood] *= 0.95  # Whenever actor is trying to find policy distribution
         # th_layer = nn.Threshold(1, 0)
         # pi = th_layer(pi)
         # Remove the dimensions of size one
@@ -126,6 +131,31 @@ class DiscreteActorCritic:
             action = dist.sample()
         return action
 
+    def pick_greedy_action(self):
+        legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
+        best_action = None
+        best_reward = 0
+        if self.problem.num_actions + self.problem.budget_offset < 2:
+            vs = self.problem.ig_g.vs()
+            node_to_degree = {v["name"]: self.problem.ig_g.degree(v) for v in vs}
+            legal_nodes = [self.problem.index_to_node[index] for index in legal_actions]
+            best_node = max(legal_nodes, key=lambda x: node_to_degree[x])
+            best_action = self.problem.index_to_node.inverse[best_node]
+            _, best_reward, _, _ = self.problem.step(best_action)
+            self.problem.btwn_cent -= best_reward
+            _, _, _, _ = self.problem.step(best_action, no_calc=True)
+        else:
+            for action in legal_actions:
+                _, reward, _, _ = self.problem.step(action)
+                reward = reward.item()
+                if reward > best_reward:
+                    best_action = action
+                    best_reward = reward
+                self.problem.btwn_cent -= reward
+                _, _, _, _ = self.problem.step(action, no_calc=True)
+
+        return best_action, torch.Tensor([best_reward])
+
     def update_model(self, PI, R, V):
         self.gcn_optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:
@@ -134,7 +164,7 @@ class DiscreteActorCritic:
         L_policy = -(torch.log(PI) * A).mean()
         L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
         L_entropy = -(PI * PI.log()).mean()
-        L = L_policy + L_value  # - 0.1 * L_entropy
+        L = L_policy + L_value + 0.1 * L_entropy
         L.backward()
         self.gcn_optimizer.step()
         self.lr_schedule.step()
