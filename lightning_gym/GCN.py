@@ -6,7 +6,7 @@ References:
 """
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
-from dgl import readout_nodes
+from dgl import mean_nodes
 from copy import deepcopy
 
 
@@ -62,7 +62,7 @@ class GCN(nn.Module):
             else:
                 h = layer(g, h)  # Features after they been convoluted, these represent the nodes
         g.ndata['h'] = h
-        mN = readout_nodes(g, 'h', op="mean")  # column-wise average of those node features, this represents the graph
+        mN = mean_nodes(g, 'h')  # column-wise average of those node features, this represents the graph
         PI = self.policy(h)
         V = self.value(mN)
         return PI, V
