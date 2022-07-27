@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def gen_budget_data(config, start=1, stop=15, step=1):
+def gen_budget_data(config, start=1, stop=25, step=1):
     """
     Override budget in config and repeat the experiment from k=1->15
     :return:
@@ -30,7 +30,7 @@ def gen_budget_data(config, start=1, stop=15, step=1):
         rando = RandomAgent(env)
         topk_btwn = TopBtwnAgent(env)
         topk_degree = TopDegreeAgent(env)
-        greed = GreedyAgent(env)
+        # greed = GreedyAgent(env)
         trained = TrainedGreedyAgent(env, config)
         kcenter = kCenterAgent(env)
 
@@ -38,14 +38,15 @@ def gen_budget_data(config, start=1, stop=15, step=1):
         random_results.append(rando.run_episode())
         between_results.append(topk_btwn.run_episode())
         degree_results.append(topk_degree.run_episode())
-        greedy_results.append(greed.run_episode())
+        # greedy_results.append(greed.run_episode())
         trained_results.append(trained.run_episode())
         kcenter_results.append(kcenter.run_episode())
+        print("Round:", i)
         print("A2C Results", agent_results[-1])
         print("Random Results:", random_results[-1])
         print("TopK Betweenness Results:", between_results[-1])
         print("TopK Degree Results:", degree_results[-1])
-        print("Greed Results:", greedy_results[-1])
+        # print("Greed Results:", greedy_results[-1])
         print("Trained Greedy Results:", trained_results[-1])
         print("kCenter Results:", kcenter_results[-1])
         print()
@@ -59,15 +60,17 @@ def gen_budget_data(config, start=1, stop=15, step=1):
         "Degree": degree_results,
         "A2C": agent_results,
         "k-Center": kcenter_results,
-        "Greedy": greedy_results,
+        # "Greedy": greedy_results,
         "Trained Greedy": trained_results,
     }, index=list(range(0, stop - start + 1, step)))
     df.to_pickle("budget_data_128.pkl")
 
 
 def plot_changing_budget():
-    df = pd.read_pickle("budget_data_1028.pkl")
+    df = pd.read_pickle("budget_data_128.pkl")
     df = df.rename(columns={"Agent": "A2C", "kCenter": "k-Center"})
+    # for col in ["Random","Betweenness","Degree","A2C","k-Center","Trained Greedy"]:
+    #     df[col] = df[col]/df["Trained Greedy"]
     df.plot()
 
     a = 15
