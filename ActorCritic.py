@@ -14,6 +14,7 @@ class DiscreteActorCritic:
         self.path = config.get("agent", "model_file")
         self.cuda = config.getboolean("agent", "cuda")
         self._load_model = config.getboolean("agent", "load_model")
+        self.episode = 0
         # self.memory_replay_buffer = ReplayMemory(5000)
 
         # hyperparameters
@@ -163,7 +164,7 @@ class DiscreteActorCritic:
     # Run so many numbers of episode then run the model
     def train(self):
         [PI, R, V] = self.run_episode()  # getting new json file, getting new graph/ subgraph
-        for i in range(self.num_episodes - 1):  # for each range in episodes, why do have episodes = 1???
+        for self.episode in range(self.num_episodes - 1):  # for each range in episodes, why do have episodes = 1???
             [pi, r, v] = self.run_episode()
             # Update model
             PI = torch.cat([PI, pi], dim=0)  # Appending what learned to previous pi
