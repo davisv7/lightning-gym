@@ -15,7 +15,7 @@ class DiscreteActorCritic:
         self.cuda = config.getboolean("agent", "cuda")
         self._load_model = config.getboolean("agent", "load_model")
         self.episode = 0
-        # self.memory_replay_buffer = ReplayMemory(5000)
+        # self.memory_replay_buffer = ReplayBuffer(5000)
 
         # hyperparameters
         self.in_feats = config.getint("agent", "in_features")
@@ -132,31 +132,6 @@ class DiscreteActorCritic:
             action = dist.sample()
         return action
 
-    def pick_greedy_action(self):
-        legal_actions = self.problem.get_legal_actions().squeeze().detach().numpy()
-        best_action = None
-        best_reward = 0
-        if self.problem.num_actions + self.problem.budget_offset < 2:
-            vs = self.problem.ig_g.vs()
-            node_to_degree = {v["name"]: self.problem.ig_g.degree(v) for v in vs}
-            legal_nodes = [self.problem.index_to_node[index] for index in legal_actions]
-            best_node = max(legal_nodes, key=lambda x: node_to_degree[x])
-            best_action = self.problem.index_to_node.inverse[best_node]
-            _, best_reward, _, _ = self.problem.step(best_action)
-            self.problem.btwn_cent -= best_reward
-            _, _, _, _ = self.problem.step(best_action, no_calc=True)
-        else:
-            for action in legal_actions:
-                _, reward, _, _ = self.problem.step(action)
-                reward = reward.item()
-                if reward > best_reward:
-                    best_action = action
-                    best_reward = reward
-                self.problem.btwn_cent -= reward
-                _, _, _, _ = self.problem.step(action, no_calc=True)
-
-        return best_action, torch.Tensor([best_reward])
-
     def update_model(self, PI, R, V):
         self.gcn_optimizer.zero_grad()  # needed to update parameter correctly
         if self.cuda:
@@ -165,7 +140,7 @@ class DiscreteActorCritic:
         L_policy = -(torch.log(PI) * A).mean()
         L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
         L_entropy = -(PI * PI.log()).mean()
-        L = L_policy + L_value + 0.1 * L_entropy
+        L = L_policy + L_value  # - 0.1 * L_entropy
         L.backward()
         self.gcn_optimizer.step()
         self.lr_schedule.step()
@@ -173,12 +148,12 @@ class DiscreteActorCritic:
         self.logger.add_log('entropy', L_entropy.cpu().detach().item())
 
     # def memory_replay(self):
-    #     self.optimizer.zero_grad()  # needed to update parameter correctly
+    #     self.gcn_optimizer.zero_grad()  # needed to update parameter correctly
     #     num_exp = 500
     #     if len(self.memory_replay_buffer) >= num_exp:
     #         experiences = sample(self.memory_replay_buffer, num_exp)
     #     else:
-    #         experiences = self.memory_replay_buffer
+    #         return
     #     PI, R, V = list(map(lambda x: torch.cat(x), zip(*experiences)))
     #     PI, R, V = list(map(lambda x: x.unsqueeze(-1), [PI, R, V]))
     #     V = V.unsqueeze(-1)
@@ -188,15 +163,13 @@ class DiscreteActorCritic:
     #     L_value = F.smooth_l1_loss(V.squeeze(), R.squeeze())
     #     L = L_policy + L_value  # - 0.1 * L_entropy
     #     L.backward()
-    #     self.optimizer.step()
+    #     self.gcn_optimizer.step()
 
-    # Run so many numbers of episode then run the model
     def train(self):
-        [PI, R, V] = self.run_episode()  # getting new json file, getting new graph/ subgraph
-        for self.episode in range(self.num_episodes - 1):  # for each range in episodes, why do have episodes = 1???
+        [PI, R, V] = [torch.Tensor(), torch.Tensor(), torch.Tensor()]
+        for self.episode in range(self.num_episodes):
             [pi, r, v] = self.run_episode()
-            # Update model
-            PI = torch.cat([PI, pi], dim=0)  # Appending what learned to previous pi
+            PI = torch.cat([PI, pi], dim=0)
             R = torch.cat([R, r], dim=0)
             V = torch.cat([V, v], dim=0)
         # self.memory_replay()
