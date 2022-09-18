@@ -127,7 +127,7 @@ def gen_monthly_data(config):
 
 def plot_changing_month(df=None):
     if df is None:
-        df = pd.read_pickle("monthly_data.pkl")
+        df = pd.read_pickle("results/monthly_data.pkl")
     # df = round(df, 4)
     df.index = [x.capitalize() for x in df.index]
     df = df.rename(columns={"Agent": "A2C", "kCenter": "k-Center"})
@@ -143,7 +143,7 @@ def plot_changing_month(df=None):
 
 def plot_network_size(df=None):
     if df is None:
-        df = pd.read_pickle("sizes_data.pkl")
+        df = pd.read_pickle("results/sizes_data.pkl")
     df.index = [x.capitalize() for x in df.index]
     df[['Nodes Before', 'Nodes After']].plot.bar(rot=0)
     plt.title("Change in Number of Nodes After Pruning")
@@ -161,7 +161,7 @@ def plot_network_size(df=None):
 
 def plot_runtimes(df=None):
     if df is None:
-        df = pd.read_pickle("runtime_data.pkl")
+        df = pd.read_pickle("results/runtime_data.pkl")
     df.index = [x.capitalize() for x in df.index]
     df = df.rename(columns={"Agent": "A2C", "kCenter": "k-Center"})
     df = round(df, 2)
