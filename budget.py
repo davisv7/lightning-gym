@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def gen_budget_data(config, start=1, stop=25, step=1):
+def gen_budget_data(config, start=1, stop=15, step=1):
     """
     Override budget in config and repeat the experiment from k=1->15
     :return:
@@ -63,11 +63,11 @@ def gen_budget_data(config, start=1, stop=25, step=1):
         # "Greedy": greedy_results,
         "Trained Greedy": trained_results,
     }, index=list(range(0, stop - start + 1, step)))
-    df.to_pickle("budget_data_128.pkl")
+    df.to_pickle("results/budget_data_4096.pkl")
 
 
 def plot_changing_budget():
-    df = pd.read_pickle("budget_data_128.pkl")
+    df = pd.read_pickle("results/budget_data_4096.pkl")
     df = df.rename(columns={"Agent": "A2C", "kCenter": "k-Center"})
     # for col in ["Random","Betweenness","Degree","A2C","k-Center","Trained Greedy"]:
     #     df[col] = df[col]/df["Trained Greedy"]
@@ -75,7 +75,7 @@ def plot_changing_budget():
 
     a = 15
     plt.xticks(np.arange(a), np.arange(1, a + 1))
-    plt.title("Comparison of Betweenness Improvement (1024)")
+    plt.title("Comparison of Betweenness Improvement (4096)")
     plt.xlabel("Budget")
     plt.ylabel("Betweenness Improvement")
     plt.show()

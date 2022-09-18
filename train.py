@@ -11,14 +11,14 @@ from baselines import TrainedGreedyAgent, GreedyAgent
 warnings.filterwarnings("ignore")
 
 
-def get_pog(env, config, last_reward):
+def get_greedy_reward(env, config):
     old_setting = env.repeat
     env.repeat = True
     greedy = TrainedGreedyAgent(env, config)
-    # greedy = GreedyAgent(env)
-    g_reward = greedy.run_episode()
+    _ = greedy.run_episode()
+    g_reward = greedy.problem.get_betweenness()
     env.repeat = old_setting
-    return round(last_reward / g_reward, 4)
+    return g_reward
 
 
 def train_agent(config, pog=False):
@@ -30,7 +30,8 @@ def train_agent(config, pog=False):
         log = ajay.train()
         last_reward = ajay.problem.get_betweenness()
         if pog:
-            pog = get_pog(env, config, last_reward)
+            g_reward = get_greedy_reward(env, config)
+            pog = last_reward / g_reward
             log.add_log("pog", pog)
             last_reward = pog
         recommendations = env.get_recommendations()
