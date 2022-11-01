@@ -48,14 +48,14 @@ def train_agent(config, pog=False):
 
 
 def train_upwards(config):
-    logs = []
+    log = Logger()
     start = 4
     end = start + 5
     for power in range(start, end):  # creating i amount of subgraphs and testing each one
         k = 2 ** power
         config["env"]["n"] = str(k)
         log = train_agent(config)
-        logs.append(log)
+        log.extend_log(train_agent(config))
         config["agent"]["load_model"] = "True"
     return log
 
