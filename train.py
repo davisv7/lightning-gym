@@ -8,6 +8,7 @@ from lightning_gym.utils import random_seed
 from baselines import TrainedGreedyAgent, kCenterAgent
 import pandas as pd
 import matplotlib.pyplot as plt
+from lightning_gym.graph_utils import *
 
 warnings.filterwarnings("ignore")
 
@@ -23,7 +24,11 @@ def get_greedy_reward(env, config):
 
 
 def train_agent(config, pog=False):
-    env = NetworkEnvironment(config)
+    if config["env"]["graph_type"] == "snapshot":
+        g, k_to_a, _ = create_snapshot_env(config)
+        env = NetworkEnvironment(config, g=g)
+    else:
+        env = NetworkEnvironment(config)
     ajay = DiscreteActorCritic(env, config)
     log = None
     verbose = config.getboolean("training", "verbose")

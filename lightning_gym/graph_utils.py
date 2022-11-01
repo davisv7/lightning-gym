@@ -15,6 +15,47 @@ from littleballoffur import DiffusionSampler, CommunityStructureExpansionSampler
 from bidict import bidict
 
 
+def create_snapshot_env(config):
+    json_filename = config["env"]["filename"]
+    ds = config.getboolean("env", "down_sample")
+    nodes, edges = load_json(path.join(getcwd(), "snapshots", json_filename))
+    key_to_alias = dict({x["pub_key"]: x["alias"] for x in nodes})
+    size_before = len(nodes), len(edges)
+    print(size_before)
+    # clean nodes
+    active_nodes = get_pubkeys(nodes)
+
+    # clean edges
+    edge_filters = config["edge_filters"]
+    active_edges = clean_edges(edges, edge_filters)
+    active_edges = get_channels_with_attrs(active_edges)
+
+    # Create graph
+    g = nx.MultiDiGraph()
+    g.add_edges_from(active_edges)
+    g = nx.MultiDiGraph(g.subgraph(active_nodes))
+
+    # reduce graph
+    graph_filters = config["graph_filters"]
+    if graph_filters.getboolean("combine_multiedges"):
+        g = simplify_graph(g)
+    if graph_filters.getboolean("remove_bridges"):
+        g = nx.DiGraph(reduce_to_mainnet(g))
+    if graph_filters.getboolean("undirected"):
+        g = undirected(g)
+    if graph_filters.getboolean("unweighted"):
+        nx.set_edge_attributes(g, values=0.1, name='cost')
+
+    if ds:
+        g = down_sample(g, config)
+
+    size_after = len(g.nodes()), len(g.edges()) // 2
+    print(size_after)
+
+    # create an environment, an agent, and then train for some number of episodes
+    return g, key_to_alias, (size_before, size_after)
+
+
 def make_nx_graph(nodes, edges):
     """
     For each node in nodes, add a node with the pubkey as its ID
