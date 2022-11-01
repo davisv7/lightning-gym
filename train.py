@@ -2,12 +2,9 @@ from lightning_gym.envs.lightning_network import NetworkEnvironment
 import warnings
 from ActorCritic import DiscreteActorCritic
 from lightning_gym.Logger import Logger
-from lightning_gym.utils import plot_apsp
 import configparser
 from lightning_gym.utils import random_seed
 from baselines import TrainedGreedyAgent, kCenterAgent
-import pandas as pd
-import matplotlib.pyplot as plt
 from lightning_gym.graph_utils import *
 
 warnings.filterwarnings("ignore")
