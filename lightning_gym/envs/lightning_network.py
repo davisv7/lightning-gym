@@ -26,6 +26,7 @@ class NetworkEnvironment(Env):
         self.graph_type = config.get("env", "graph_type")
         self.filename = config.get("env", "filename", fallback=None)
         self.cutoff = config.getint("env", "cutoff")
+        self.ppm = config.getfloat("env", "ppm", fallback=0.1)
         self.n = config.getint("env", "n", fallback=None)
         self.config = config
 
@@ -182,8 +183,8 @@ class NetworkEnvironment(Env):
             self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:
-            self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
-            self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)
+            self.ig_g.add_edge(neighbor_id, self.node_id, cost=self.ppm)
+            self.ig_g.add_edge(self.node_id, neighbor_id, cost=self.ppm)
             self.dgl_g.add_edges(torch.tensor([neighbor_index, self.node_index]),
                                  torch.tensor([self.node_index, neighbor_index]))
             self.node_features[action, -1] = 1
