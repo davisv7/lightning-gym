@@ -277,6 +277,9 @@ class NetworkEnvironment(Env):
             j = torch.arange(self.node_features.size(0)).long()
             self.node_features[j, -1] = self.node_vector
         else:
+            # pageranks = np.array(self.ig_g.pagerank())
+            # pageranks = scaler.fit_transform(pageranks.reshape(-1, 1)).squeeze()
+            # pageranks = torch.Tensor(pageranks).unsqueeze(-1)
             # degrees = np.array(self.ig_g.strength(mode="in"))
             # norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
             # norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
@@ -297,10 +300,11 @@ class NetworkEnvironment(Env):
             # norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
             #
             # self.node_features = torch.cat((
-            #     norm_degrees,
+            # norm_degrees,
             # norm_closeness,
             # norm_betweenness,
             # norm_eigenness,
+            # pageranks,
             # self.node_vector.unsqueeze(-1)
             # ), dim=1)
             self.node_features = self.node_vector.unsqueeze(-1)
