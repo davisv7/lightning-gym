@@ -5,6 +5,9 @@ import configparser
 from lightning_gym.graph_utils import *
 from baselines import *
 import argparse
+from collections import defaultdict
+
+from lightning_gym.graph_utils import *
 
 
 def create_snapshot_env(config):
@@ -76,6 +79,7 @@ def main():
         env, k_to_a, _ = create_snapshot_env(config)
     else:
         env = NetworkEnvironment(config)
+        k_to_a = defaultdict(str)
 
     ajay = DiscreteActorCritic(env, config)
     # rando = RandomAgent(env)
