@@ -5,46 +5,9 @@ import configparser
 from lightning_gym.graph_utils import *
 from baselines import *
 import argparse
+from collections import defaultdict
 
-
-def create_snapshot_env(config):
-    json_filename = config["env"]["filename"]
-    ds = config.getboolean("env", "down_sample")
-    nodes, edges = load_json(path.join(getcwd(), "snapshots", json_filename))
-    key_to_alias = dict({x["pub_key"]: x["alias"] for x in nodes})
-    size_before = len(nodes), len(edges)
-    print(size_before)
-    # clean nodes
-    active_nodes = get_pubkeys(nodes)
-
-    # clean edges
-    edge_filters = config["edge_filters"]
-    active_edges = clean_edges(edges, edge_filters)
-    active_edges = get_channels_with_attrs(active_edges)
-
-    # Create graph
-    g = nx.MultiDiGraph()
-    g.add_edges_from(active_edges)
-    g = nx.MultiDiGraph(g.subgraph(active_nodes))
-    if ds:
-        g = down_sample(g, config)
-
-    # reduce graph
-    graph_filters = config["graph_filters"]
-    if graph_filters.getboolean("combine_multiedges"):
-        g = simplify_graph(g)
-    if graph_filters.getboolean("remove_bridges"):
-        g = nx.DiGraph(reduce_to_mainnet(g))
-    if graph_filters.getboolean("undirected"):
-        g = undirected(g)
-    if graph_filters.getboolean("unweighted"):
-        nx.set_edge_attributes(g, values=0.1, name='cost')
-
-    size_after = len(g.nodes()), len(g.edges()) // 2
-    print(size_after)
-
-    # create an environment, an agent, and then train for some number of episodes
-    return NetworkEnvironment(config, g=g), key_to_alias, (size_before, size_after)
+from lightning_gym.graph_utils import *
 
 
 def main():
@@ -73,17 +36,19 @@ def main():
         print("seed set")
 
     if config["env"]["graph_type"] == "snapshot":
-        env, k_to_a, _ = create_snapshot_env(config)
+        g, k_to_a, _ = create_snapshot_env(config)
+        env = NetworkEnvironment(config, g=g)
     else:
         env = NetworkEnvironment(config)
+        k_to_a = defaultdict(str)
 
     ajay = DiscreteActorCritic(env, config)
-    # rando = RandomAgent(env)
-    # topk_btwn = TopBtwnAgent(env)
-    # topk_degree = TopDegreeAgent(env)
-    # greed = GreedyAgent(env)
+    rando = RandomAgent(env)
+    topk_btwn = TopBtwnAgent(env)
+    topk_degree = TopDegreeAgent(env)
     kCenter = kCenterAgent(env)
-    # trained = TrainedGreedyAgent(env, config)
+    trained = TrainedGreedyAgent(env, config)
+    # greed = GreedyAgent(env)
 
     # num_episodes = config.getint("training", "episodes")
     # for episode in range(num_episodes):
@@ -92,19 +57,37 @@ def main():
     #     print("E: {}, R: {:.4f}, N:{}".format(episode, env.btwn_cent, recommendations))
     # ajay.save_model()
 
-    print("Test Results:", ajay.test())
-    # print(ajay.problem.get_closeness())
-    # print(ajay.problem.get_recommendations())
-    # print([k_to_a[key] for key in ajay.problem.get_recommendations()])
-    # # print("Random Results:", rando.run_episode())
-    # print("TopK Results:", topk_btwn.run_episode())
-    # print(topk_btwn.problem.get_closeness())
-    # print(topk_btwn.problem.get_recommendations())
-    # print([k_to_a[key] for key in topk_btwn.problem.get_recommendations()])
-    # print("TopK Degree Results:", topk_degree.run_episode())
-    # print("Trained Greedy Results:", trained.run_episode())
+    print("A2C Results:", ajay.test())
+    print(ajay.problem.get_recommendations())
+    print([k_to_a[key] for key in ajay.problem.get_recommendations()])
+    print()
+
+    print("Random Results:", rando.run_episode())
+    print(rando.problem.get_recommendations())
+    print([k_to_a[key] for key in rando.problem.get_recommendations()])
+    print()
+
+    print("TopK Btwn Results:", topk_btwn.run_episode())
+    print(topk_btwn.problem.get_recommendations())
+    print([k_to_a[key] for key in topk_btwn.problem.get_recommendations()])
+    print()
+
+    print("TopK Degree Results:", topk_degree.run_episode())
+    print(topk_degree.problem.get_recommendations())
+    print([k_to_a[key] for key in topk_degree.problem.get_recommendations()])
+    print()
+
     print("kCenter Results:", kCenter.run_episode())
-    # # print("Greed Results:", greed.run_episode())
+    print(kCenter.problem.get_recommendations())
+    print([k_to_a[key] for key in kCenter.problem.get_recommendations()])
+    print()
+
+    print("Trained Greedy Results:", trained.run_episode())
+    print(trained.problem.get_recommendations())
+    print([k_to_a[key] for key in trained.problem.get_recommendations()])
+    print()
+
+    # print("Greed Results:", greed.run_episode())
     # print('total reward: ', ajay.logger.log['tot_reward'])
     # print("td error: ", ajay.logger.log['td_error'])
     # print("entropy: ", ajay.logger.log['entropy'])

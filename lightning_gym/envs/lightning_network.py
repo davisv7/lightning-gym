@@ -26,6 +26,7 @@ class NetworkEnvironment(Env):
         self.graph_type = config.get("env", "graph_type")
         self.filename = config.get("env", "filename", fallback=None)
         self.cutoff = config.getint("env", "cutoff")
+        self.ppm = config.getfloat("env", "ppm", fallback=0.1)
         self.n = config.getint("env", "n", fallback=None)
         self.config = config
 
@@ -95,41 +96,34 @@ class NetworkEnvironment(Env):
         Could also be represented by the betweenness of the most recently added edge.
         :return:
         """
-        # old_btwn = self.btwn_cent
-        new_btwn = self.get_betweenness()
-        # reward = new_btwn - old_btwn
-        reward = new_btwn
+        weights = "cost"
+        key = "".join(list(map(str, self.get_recommendations())))
+        if self.repeat and key in self.btwn_dict:
+            new_btwn = self.btwn_dict[key]
+            # new_close = self.close_dict[key]
+        elif self.repeat:
+            new_btwn = self.get_betweenness()
+            # new_close = self.get_closeness()
+            self.btwn_dict[key] = new_btwn
+            # self.close_dict[key] = new_close
+        else:
+            new_btwn = self.get_betweenness()
+            # new_close = self.get_closeness()
 
-        # reward = new_close
-        # reward = new_close - self.close_cent
+        reward = new_btwn - self.btwn_cent
+        self.btwn_cent = new_btwn
         return reward
 
     def get_closeness(self):
-        self.close_cent = self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
-        return self.close_cent
+        return self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
 
     def get_betweenness(self):
-        key = "".join(list(map(str, self.get_recommendations())))
-        if self.repeat and key in self.btwn_dict:
-            self.btwn_cent = self.btwn_dict[key]
-            # new_close = self.close_dict[key]
-        elif self.repeat:
-            self.btwn_cent = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
-            self.btwn_dict[key] = self.btwn_cent
-            # new_close = self.get_closeness()
-            # self.close_dict[key] = new_close
-        elif self.num_actions + self.budget_offset < 2:
-            self.btwn_cent = 0
-        else:
-            self.btwn_cent = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
-        return self.btwn_cent
+        return self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
 
     def get_betweennesses(self):
-        scaler = MinMaxScaler()
         betweenness = np.array(self.ig_g.betweenness(directed=True, weights="cost"))
-        betweenness[-1] = 0
-        norm_betweenness = scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze()
-        norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
+        betweenness = betweenness / self.norm
+        norm_betweenness = torch.Tensor(betweenness).unsqueeze(-1)
         return norm_betweenness.squeeze().numpy().tolist()
 
     def get_recommendations(self):
@@ -189,8 +183,8 @@ class NetworkEnvironment(Env):
             self.node_features[action, -1] = 0
             self.num_actions -= 1
         else:
-            self.ig_g.add_edge(neighbor_id, self.node_id, cost=0.1)
-            self.ig_g.add_edge(self.node_id, neighbor_id, cost=0.1)
+            self.ig_g.add_edge(neighbor_id, self.node_id, cost=self.ppm)
+            self.ig_g.add_edge(self.node_id, neighbor_id, cost=self.ppm)
             self.dgl_g.add_edges(torch.tensor([neighbor_index, self.node_index]),
                                  torch.tensor([self.node_index, neighbor_index]))
             self.node_features[action, -1] = 1
@@ -206,7 +200,7 @@ class NetworkEnvironment(Env):
                 self.nx_graph = get_snapshot(self.filename)
 
             if self.node_id not in self.default_node_ids:
-                self.index_to_node = bidict(enumerate(sorted(self.nx_graph.nodes())))
+                self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
                 self.node_index = self.index_to_node.inverse[self.node_id]
             else:
                 self.add_node("")
@@ -214,9 +208,10 @@ class NetworkEnvironment(Env):
             self.nx_graph = random_scale_free(self.n)
             # print(len(self.nx_graph.nodes()), len(self.nx_graph.edges()))
             self.add_node(self.n)
+        self.graph_size = len(self.nx_graph.nodes())
 
         # Create bidictionary = tuple index: pubKey
-        self.index_to_node = bidict(enumerate(sorted(self.nx_graph.nodes())))
+        self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
 
         self.base_graph = deepcopy(self.nx_graph)
 
@@ -256,16 +251,16 @@ class NetworkEnvironment(Env):
         :return:
         """
         self.preexisting_neighbors = torch.zeros(self.graph_size)
-        # neighborhood = self.ig_g.neighborhood(vertices=[self.node_index], order=1)
-        # self.preexisting_neighbors[neighborhood] = 1
-        # if self.preexisting_neighbors is None or not self.repeat:
-        #     if self.node_id not in self.default_node_ids:
-        #         incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
-        #         if incident_edges:
-        #             vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
-        #             vertices = vertices[vertices != self.node_index].type(torch.long)
-        #             self.preexisting_neighbors = self.preexisting_neighbors.put(vertices, torch.ones(len(vertices)))
-        #             self.budget_offset = len(vertices)
+        if self.node_id not in self.default_node_ids:
+            neighbors = self.ig_g.neighbors(self.node_id)
+            neighbors = torch.Tensor(neighbors).unique().type(torch.long)
+            self.preexisting_neighbors[neighbors] = 1
+            # incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_incident=[self.node_id])]
+            # if incident_edges:
+            #     vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
+            #     vertices = vertices[vertices != self.node_index].type(torch.long)
+            #     self.preexisting_neighbors[vertices] = 1
+            # self.budget_offset = len(vertices)
 
     def update_node_features(self):
         """
@@ -283,6 +278,9 @@ class NetworkEnvironment(Env):
             j = torch.arange(self.node_features.size(0)).long()
             self.node_features[j, -1] = self.node_vector
         else:
+            # pageranks = np.array(self.ig_g.pagerank())
+            # pageranks = scaler.fit_transform(pageranks.reshape(-1, 1)).squeeze()
+            # pageranks = torch.Tensor(pageranks).unsqueeze(-1)
             # degrees = np.array(self.ig_g.strength(mode="in"))
             # norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
             # norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
@@ -303,10 +301,11 @@ class NetworkEnvironment(Env):
             # norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
             #
             # self.node_features = torch.cat((
-            #     norm_degrees,
+            # norm_degrees,
             # norm_closeness,
             # norm_betweenness,
             # norm_eigenness,
+            # pageranks,
             # self.node_vector.unsqueeze(-1)
             # ), dim=1)
             self.node_features = self.node_vector.unsqueeze(-1)
@@ -324,41 +323,40 @@ class NetworkEnvironment(Env):
         :return:
         """
         self.action_mask = np.zeros(self.graph_size)
-        self.action_mask[self.index_to_node.inverse[self.node_id]] = 1  # make sure we cannot select our own node
-        # if self.action_mask is None or not self.repeat:
-        #     if self.graph_type == "scale_free":
-        #         self.action_mask = np.zeros(self.graph_size)
-        #     else:
-        #         candidate_filters = self.config["action_mask"]
-        #         self.action_mask = np.zeros(self.graph_size)
-        #         min_degree = candidate_filters.getint("minimum_channels", 0)
-        #         min_avg_cap = candidate_filters.getint("min_avg_capacity", 0)
-        #         # min_reliability = candidate_filters.getfloat("min_reliability", None)
-        #         # min_btwn = candidate_filters.getfloat("min_betweenness", 0)
-        #
-        #         for i, node in enumerate(self.nx_graph.nodes()):
-        #             if node in self.default_node_ids:
-        #                 continue
-        #
-        #             degree = self.nx_graph.degree(node)
-        #             if degree < min_degree:
-        #                 self.action_mask[i] = 1
-        #                 continue
-        #
-        #             incident_capacities = [self.nx_graph[node][n]["capacity"] for n in self.nx_graph.neighbors(node)]
-        #             total_capacity = sum(incident_capacities)
-        #             avg_capacity = total_capacity / degree
-        #
-        #             if avg_capacity < min_avg_cap:
-        #                 self.action_mask[i] = 1
-        #                 continue
-        #             # elif self.features[i][0] / self.norm == min_btwn:
-        #             #     self.action_mask[i] = 1
-        #             # if min_reliability:
-        #             #     reliability = get_reliability(node)
-        #             #     if reliability < min_reliability:
-        #             #         action_mask[i] = 1
-        #             #         continue
+        if self.graph_type == "scale_free":
+            self.action_mask = np.zeros(self.graph_size)
+        else:
+            candidate_filters = self.config["action_mask"]
+            self.action_mask = np.zeros(self.graph_size)
+            min_degree = candidate_filters.getint("minimum_channels", 0)
+            min_avg_cap = candidate_filters.getint("min_avg_capacity", 0)
+            # min_reliability = candidate_filters.getfloat("min_reliability", None)
+            # min_btwn = candidate_filters.getfloat("min_betweenness", 0)
+
+            for i, node in enumerate(self.nx_graph.nodes()):
+                if node in self.default_node_ids:
+                    continue
+
+                degree = self.nx_graph.degree(node)
+                if degree < min_degree:
+                    self.action_mask[i] = 1
+                    continue
+
+                incident_capacities = [self.nx_graph[node][n]["capacity"] for n in self.nx_graph.neighbors(node)]
+                total_capacity = sum(incident_capacities)
+                avg_capacity = total_capacity / degree
+
+                if avg_capacity < min_avg_cap:
+                    self.action_mask[i] = 1
+                    continue
+                # elif self.features[i][0] / self.norm == min_btwn:
+                #     self.action_mask[i] = 1
+                # if min_reliability:
+                #     reliability = get_reliability(node)
+                #     if reliability < min_reliability:
+                #         action_mask[i] = 1
+                #         continue
+        self.action_mask[self.node_index] = 1  # make sure we cannot select our own node
 
     def get_neighborhood(self, order):
         # also add neighborhood to action mask
