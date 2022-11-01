@@ -121,9 +121,8 @@ class NetworkEnvironment(Env):
     def get_betweennesses(self):
         scaler = MinMaxScaler()
         betweenness = np.array(self.ig_g.betweenness(directed=True, weights="cost"))
-        betweenness[-1] = 0
-        norm_betweenness = scaler.fit_transform(betweenness.reshape(-1, 1)).squeeze()
-        norm_betweenness = torch.Tensor(norm_betweenness).unsqueeze(-1)
+        betweenness = betweenness / self.norm
+        norm_betweenness = torch.Tensor(betweenness).unsqueeze(-1)
         return norm_betweenness.squeeze().numpy().tolist()
 
     def get_recommendations(self):
