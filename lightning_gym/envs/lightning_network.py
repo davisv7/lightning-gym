@@ -200,7 +200,7 @@ class NetworkEnvironment(Env):
                 self.nx_graph = get_snapshot(self.filename)
 
             if self.node_id not in self.default_node_ids:
-                self.index_to_node = bidict(enumerate(sorted(self.nx_graph.nodes())))
+                self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
                 self.node_index = self.index_to_node.inverse[self.node_id]
             else:
                 self.add_node("")
@@ -208,9 +208,10 @@ class NetworkEnvironment(Env):
             self.nx_graph = random_scale_free(self.n)
             # print(len(self.nx_graph.nodes()), len(self.nx_graph.edges()))
             self.add_node(self.n)
+        self.graph_size = len(self.nx_graph.nodes())
 
         # Create bidictionary = tuple index: pubKey
-        self.index_to_node = bidict(enumerate(sorted(self.nx_graph.nodes())))
+        self.index_to_node = bidict(enumerate(self.nx_graph.nodes()))
 
         self.base_graph = deepcopy(self.nx_graph)
 
