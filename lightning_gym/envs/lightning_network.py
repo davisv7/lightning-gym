@@ -322,41 +322,40 @@ class NetworkEnvironment(Env):
         :return:
         """
         self.action_mask = np.zeros(self.graph_size)
-        self.action_mask[self.index_to_node.inverse[self.node_id]] = 1  # make sure we cannot select our own node
-        # if self.action_mask is None or not self.repeat:
-        #     if self.graph_type == "scale_free":
-        #         self.action_mask = np.zeros(self.graph_size)
-        #     else:
-        #         candidate_filters = self.config["action_mask"]
-        #         self.action_mask = np.zeros(self.graph_size)
-        #         min_degree = candidate_filters.getint("minimum_channels", 0)
-        #         min_avg_cap = candidate_filters.getint("min_avg_capacity", 0)
-        #         # min_reliability = candidate_filters.getfloat("min_reliability", None)
-        #         # min_btwn = candidate_filters.getfloat("min_betweenness", 0)
-        #
-        #         for i, node in enumerate(self.nx_graph.nodes()):
-        #             if node in self.default_node_ids:
-        #                 continue
-        #
-        #             degree = self.nx_graph.degree(node)
-        #             if degree < min_degree:
-        #                 self.action_mask[i] = 1
-        #                 continue
-        #
-        #             incident_capacities = [self.nx_graph[node][n]["capacity"] for n in self.nx_graph.neighbors(node)]
-        #             total_capacity = sum(incident_capacities)
-        #             avg_capacity = total_capacity / degree
-        #
-        #             if avg_capacity < min_avg_cap:
-        #                 self.action_mask[i] = 1
-        #                 continue
-        #             # elif self.features[i][0] / self.norm == min_btwn:
-        #             #     self.action_mask[i] = 1
-        #             # if min_reliability:
-        #             #     reliability = get_reliability(node)
-        #             #     if reliability < min_reliability:
-        #             #         action_mask[i] = 1
-        #             #         continue
+        if self.graph_type == "scale_free":
+            self.action_mask = np.zeros(self.graph_size)
+        else:
+            candidate_filters = self.config["action_mask"]
+            self.action_mask = np.zeros(self.graph_size)
+            min_degree = candidate_filters.getint("minimum_channels", 0)
+            min_avg_cap = candidate_filters.getint("min_avg_capacity", 0)
+            # min_reliability = candidate_filters.getfloat("min_reliability", None)
+            # min_btwn = candidate_filters.getfloat("min_betweenness", 0)
+
+            for i, node in enumerate(self.nx_graph.nodes()):
+                if node in self.default_node_ids:
+                    continue
+
+                degree = self.nx_graph.degree(node)
+                if degree < min_degree:
+                    self.action_mask[i] = 1
+                    continue
+
+                incident_capacities = [self.nx_graph[node][n]["capacity"] for n in self.nx_graph.neighbors(node)]
+                total_capacity = sum(incident_capacities)
+                avg_capacity = total_capacity / degree
+
+                if avg_capacity < min_avg_cap:
+                    self.action_mask[i] = 1
+                    continue
+                # elif self.features[i][0] / self.norm == min_btwn:
+                #     self.action_mask[i] = 1
+                # if min_reliability:
+                #     reliability = get_reliability(node)
+                #     if reliability < min_reliability:
+                #         action_mask[i] = 1
+                #         continue
+        self.action_mask[self.node_index] = 1  # make sure we cannot select our own node
 
     def add_node(self, node_id):
         """
