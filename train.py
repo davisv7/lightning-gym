@@ -60,6 +60,7 @@ def train_upwards(config):
         log = train_agent(config)
         logs.append(log)
         config["agent"]["load_model"] = "True"
+    return log
 
 
 def print_config(config):
