@@ -250,14 +250,16 @@ class NetworkEnvironment(Env):
         :return:
         """
         self.preexisting_neighbors = torch.zeros(self.graph_size)
-        # if self.preexisting_neighbors is None or not self.repeat:
-        #     if self.node_id not in self.default_node_ids:
-        #         incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_source=[self.node_id])]
-        #         if incident_edges:
-        #             vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
-        #             vertices = vertices[vertices != self.node_index].type(torch.long)
-        #             self.preexisting_neighbors = self.preexisting_neighbors.put(vertices, torch.ones(len(vertices)))
-        #             self.budget_offset = len(vertices)
+        if self.node_id not in self.default_node_ids:
+            neighbors = self.ig_g.neighbors(self.node_id)
+            neighbors = torch.Tensor(neighbors).unique().type(torch.long)
+            self.preexisting_neighbors[neighbors] = 1
+            # incident_edges = [list(x.tuple) for x in self.ig_g.es.select(_incident=[self.node_id])]
+            # if incident_edges:
+            #     vertices = torch.Tensor(reduce(lambda x, y: x + y, incident_edges)).unique()
+            #     vertices = vertices[vertices != self.node_index].type(torch.long)
+            #     self.preexisting_neighbors[vertices] = 1
+            # self.budget_offset = len(vertices)
 
     def update_node_features(self):
         """
