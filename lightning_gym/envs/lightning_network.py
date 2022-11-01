@@ -1,3 +1,5 @@
+import math
+
 from gym import Env
 from bidict import bidict
 import dgl
@@ -115,7 +117,10 @@ class NetworkEnvironment(Env):
         return reward
 
     def get_closeness(self):
-        return self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
+        closeness = self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
+        if math.isnan(closeness):
+            closeness = 0
+        return closeness
 
     def get_betweenness(self):
         return self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
