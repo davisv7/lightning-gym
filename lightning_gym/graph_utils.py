@@ -1,3 +1,4 @@
+import bidict
 import networkx as nx
 from os import path, getcwd
 import igraph as ig
@@ -10,6 +11,8 @@ from copy import deepcopy
 from typing import Dict, Tuple, List, Any
 from functools import partial
 from networkx import MultiDiGraph
+from littleballoffur import DiffusionSampler, CommunityStructureExpansionSampler
+from bidict import bidict
 
 
 def make_nx_graph(nodes, edges):
@@ -96,19 +99,19 @@ def down_sample(nx_graph, config):
     if len(nx_graph) <= n:
         return nx_graph
 
-    new_nx_graph = deepcopy(nx_graph)
-    degrees = np.array([y for x, y in nx_graph.degree()])
-    probs = 1 - np.divide(degrees, sum(degrees))
-    probs = np.divide(probs, sum(probs))
-    nodes = nx_graph.nodes()
-    un_chosen_ones = np.random.choice(nodes, len(nx_graph) - n, p=probs, replace=False)
-    # un_chosen_ones = np.random.choice(nodes, len(nx_graph) - n,  replace=False)
+    index_to_node = bidict(enumerate(nx_graph.nodes))
+    node_to_index = index_to_node.inverse
+    sample_graph = nx.Graph()
+    sample_graph.add_nodes_from(index_to_node.keys())
+    edges = [(node_to_index[x], node_to_index[y]) for x, y in nx_graph.edges()]
+    sample_graph.add_edges_from(edges)
 
-    new_nx_graph.remove_nodes_from(un_chosen_ones)
-    if node_id is not None:
-        if node_id not in new_nx_graph.nodes():
-            new_nx_graph.add_node(node_id)
-            new_nx_graph = nx.subgraph(nx_graph, new_nx_graph.nodes())
+    # sampler = CommunityStructureExpansionSampler(n)
+    sampler = DiffusionSampler(n)
+    new_nx_graph = sampler.sample(sample_graph)
+    chosen_ones = [index_to_node[idx] for idx in new_nx_graph.nodes()]
+    chosen_ones.append(node_id)
+    new_nx_graph = nx.DiGraph(nx.subgraph(nx_graph, chosen_ones)) # may differ from sampled graph
     return new_nx_graph
 
 
@@ -186,7 +189,7 @@ def channel_fee_function(channel: Dict[str, Any]) -> Tuple[float, float]:
     node1_fee_sats: float representing fee in sats to forward payment from node 1 to node 2
     node2_fee_sats: float representing fee in sats to forward payment from node 2 to node 1
     """
-    payment_amount = 100e3
+    payment_amount = 1e6
     mmsats_per_msats = 1e3
     sats_per_mmsats = 1e6
 
