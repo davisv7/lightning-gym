@@ -241,11 +241,7 @@ class NetworkEnvironment(Env):
         self.update_action_mask()
 
         self.num_actions = 0
-        if self.budget_offset < 2:
-            self.btwn_cent = 0
-        else:
-            self.btwn_cent = 0
-            self.btwn_cent = self.get_reward()
+        self.btwn_cent = self.get_betweenness()
         return self.dgl_g
 
     def update_neighbor_vector(self):
