@@ -30,6 +30,7 @@ class NetworkEnvironment(Env):
         self.cutoff = config.getint("env", "cutoff")
         self.ppm = config.getfloat("env", "ppm", fallback=0.1)
         self.n = config.getint("env", "n", fallback=None)
+        self.reward_metric = config.get("env", "reward_metric", fallback="betweenness")
         self.config = config
 
         # graphs
@@ -62,6 +63,14 @@ class NetworkEnvironment(Env):
 
         self.btwn_dict = dict()  # memoization
         self.close_dict = dict()  # memoization
+
+        self.metric_dict = {
+            "betweenness": self.get_betweenness,
+            "closeness": self.get_closeness,
+        }
+        self.reward_function = self.metric_dict[self.reward_metric]
+        self.reward_dict = dict()
+        self.old_metric = 0
 
         # make sure a valid graph type is being used
         valid_types = ['snapshot', 'random_snapshot', 'scale_free']
@@ -100,30 +109,28 @@ class NetworkEnvironment(Env):
         """
         weights = "cost"
         key = "".join(list(map(str, self.get_recommendations())))
-        if self.repeat and key in self.btwn_dict:
-            new_btwn = self.btwn_dict[key]
-            # new_close = self.close_dict[key]
-        elif self.repeat:
-            new_btwn = self.get_betweenness()
-            # new_close = self.get_closeness()
-            self.btwn_dict[key] = new_btwn
-            # self.close_dict[key] = new_close
-        else:
-            new_btwn = self.get_betweenness()
-            # new_close = self.get_closeness()
 
-        reward = new_btwn - self.btwn_cent
-        self.btwn_cent = new_btwn
+        if self.repeat and key in self.reward_dict:
+            new_metric = self.reward_dict[key]
+        elif self.repeat:
+            new_metric = self.reward_function()
+            self.reward_dict[key] = new_metric
+        else:
+            new_metric = self.reward_function()
+
+        reward = new_metric - self.old_metric
         return reward
 
     def get_closeness(self):
         closeness = self.ig_g.closeness(self.node_id, mode="in", weights="cost", normalized=True)
         if math.isnan(closeness):
             closeness = 0
-        return closeness
+        self.close_cent = closeness
+        return self.close_cent
 
     def get_betweenness(self):
-        return self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+        self.btwn_cent = self.ig_g.betweenness(self.node_id, directed=True, weights="cost") / self.norm
+        return self.btwn_cent
 
     def get_betweennesses(self):
         betweenness = np.array(self.ig_g.betweenness(directed=True, weights="cost"))
