@@ -11,7 +11,7 @@ from copy import deepcopy
 from typing import Dict, Tuple, List, Any
 from functools import partial
 from networkx import MultiDiGraph
-from littleballoffur import DiffusionSampler, CommunityStructureExpansionSampler
+# from littleballoffur import DiffusionSampler, CommunityStructureExpansionSampler
 from bidict import bidict
 
 
@@ -130,31 +130,31 @@ def nx_to_ig(nx_graph, add_self_loop=True):
     return ig_g
 
 
-def down_sample(nx_graph, config):
-    """
-    Remove nodes randomly with respect to degree centrality until under n.
-    :return:
-    """
-    n = config.getint("env", "n", fallback=None)
-    node_id = config.get("env", "node_id")
-
-    if len(nx_graph) <= n:
-        return nx_graph
-
-    index_to_node = bidict(enumerate(nx_graph.nodes))
-    node_to_index = index_to_node.inverse
-    sample_graph = nx.Graph()
-    sample_graph.add_nodes_from(index_to_node.keys())
-    edges = [(node_to_index[x], node_to_index[y]) for x, y in nx_graph.edges()]
-    sample_graph.add_edges_from(edges)
-
-    # sampler = CommunityStructureExpansionSampler(n)
-    sampler = DiffusionSampler(n)
-    new_nx_graph = sampler.sample(sample_graph)
-    chosen_ones = [index_to_node[idx] for idx in new_nx_graph.nodes()]
-    chosen_ones.append(node_id)
-    new_nx_graph = nx.DiGraph(nx.subgraph(nx_graph, chosen_ones)) # may differ from sampled graph
-    return new_nx_graph
+# def down_sample(nx_graph, config):
+#     """
+#     Remove nodes randomly with respect to degree centrality until under n.
+#     :return:
+#     """
+#     n = config.getint("env", "n", fallback=None)
+#     node_id = config.get("env", "node_id")
+#
+#     if len(nx_graph) <= n:
+#         return nx_graph
+#
+#     index_to_node = bidict(enumerate(nx_graph.nodes))
+#     node_to_index = index_to_node.inverse
+#     sample_graph = nx.Graph()
+#     sample_graph.add_nodes_from(index_to_node.keys())
+#     edges = [(node_to_index[x], node_to_index[y]) for x, y in nx_graph.edges()]
+#     sample_graph.add_edges_from(edges)
+#
+#     # sampler = CommunityStructureExpansionSampler(n)
+#     sampler = DiffusionSampler(n)
+#     new_nx_graph = sampler.sample(sample_graph)
+#     chosen_ones = [index_to_node[idx] for idx in new_nx_graph.nodes()]
+#     chosen_ones.append(node_id)
+#     new_nx_graph = nx.DiGraph(nx.subgraph(nx_graph, chosen_ones)) # may differ from sampled graph
+#     return new_nx_graph
 
 
 def undirected(nx_graph):

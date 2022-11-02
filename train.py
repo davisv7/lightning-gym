@@ -74,7 +74,7 @@ if __name__ == '__main__':
     seed = config["env"].getint("seed", fallback=None)
     if seed:
         random_seed(seed)
-    pog = True
+    pog = False
     # train_upwards(config)
     log = train_agent(config, pog=pog)
     # before_after()

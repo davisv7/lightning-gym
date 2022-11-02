@@ -21,8 +21,8 @@ def main():
     parser = argparse.ArgumentParser(description='Run  a simulation according to config.')
     # parser.add_argument("--config", type=str, default="configs/train_snapshot.conf")
     # parser.add_argument("--config", type=str, default="./configs/train_scale_free.conf")
-    # parser.add_argument("--config", type=str, default="configs/test_snapshot.conf")
-    parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
+    parser.add_argument("--config", type=str, default="configs/test_snapshot.conf")
+    # parser.add_argument("--config", type=str, default="configs/test_scale_free.conf")
     args = parser.parse_args()
     config_loc = args.config
 
