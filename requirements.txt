@@ -19,3 +19,4 @@ scipy
 seaborn
 setuptools
 torch
+uwsgi

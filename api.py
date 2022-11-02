@@ -2,6 +2,7 @@
 # encoding: utf-8
 import configparser
 import json
+import sys
 from flask import Flask, request, jsonify
 from lightning_gym.graph_utils import *
 from lightning_gym.utils import *
@@ -92,4 +93,5 @@ def run_sim():
     return jsonify(results)
 
 
-app.run(debug=True, host='0.0.0.0')
+if ("--dev" in sys.argv):
+    app.run(debug=True, host='0.0.0.0')
