@@ -1,2 +1,7 @@
 lightning_gym/__pycache__/
 venv/
+__pycache__/
+lightning_gym/envs/__pycache__/
+mbi_net.pt
+snapshots/*.json
+!snapshots/.gitkeep

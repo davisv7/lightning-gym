@@ -92,4 +92,4 @@ def run_sim():
     return jsonify(results)
 
 
-app.run(debug=True)
+app.run(debug=True, host='0.0.0.0')
