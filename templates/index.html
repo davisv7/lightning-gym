@@ -1,41 +1,47 @@
 <!doctype html>
 <html>
 <head>
-<title>Our Funky HTML Page</title>
+<title>Lightning Network Channel Optimizer</title>
 <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='style.css') }}" />
-<meta name="description" content="Our first page">
-<meta name="keywords" content="html tutorial template">
+<meta name="description" content="Find your next channel. Optimize your node's connectivity  while promoting decentralization">
 </head>
 <body>
-  <div class="rendered-form">
-    <div class="formbuilder-text form-group field-pubkey">
-        <label for="pubkey" class="formbuilder-text-label">Pubkey</label>
-        <input type="text" name="pubkey" access="false" maxlength="66" id="pubkey">
+  <div class="form">
+    <div class="form-text form-group">
+        <label for="pubkey" class="form-text-label">Pubkey</label>
+        <input type="text" name="pubkey" access="false" minlength="66" maxlength="66" id="pubkey">
     </div>
-    <div class="formbuilder-number form-group field-ppm">
-        <label for="ppm" class="formbuilder-number-label">Fee PPM</label>
+    <div class="form-number form-group">
+        <label for="ppm" class="form-number-label">Fee PPM</label>
         <input type="number" name="ppm" access="false" min="0" max="1000000" step="1" id="ppm">
     </div>
-    <div class="formbuilder-number form-group field-budget">
-        <label for="budget" class="formbuilder-number-label">Total Budget (sats)</label>
-        <input type="number" name="budget" access="false" id="budget">
+    <div class="formbuilder-number form-group">
+        <label for="budget" class="form-number-label">Total Budget (sats)</label>
+        <input type="number" name="budget" min="0" access="false" id="budget">
     </div>
-    <div class="formbuilder-number form-group field-min-cap">
-        <label for="min-cap" class="formbuilder-number-label">Min Capacity</label>
-        <input type="number" name="min-cap" access="false" id="min-cap">
+    <div class="form-number form-group">
+        <label for="min-cap" class="form-number-label">Min Capacity</label>
+        <input type="number" name="min-cap" min="0" access="false" id="min-cap">
     </div>
-    <div class="formbuilder-number form-group field-max-cap">
-        <label for="max-cap" class="formbuilder-number-label">Max Capacity</label>
-        <input type="number" name="max-cap" access="false" id="max-cap">
+    <div class="form-number form-group"> 
+        <label for="max-cap" class="form-number-label">Max Capacity</label>
+        <input type="number" name="max-cap" min="0" access="false" id="max-cap">
     </div>
-    <div class="formbuilder-number form-group field-min-chan-count">
-        <label for="min-chan-count" class="formbuilder-number-label">Minimum Channel Count</label>
-        <input type="number" name="min-chan-count" access="false" id="min-chan-count">
+    <div class="form-number form-group">
+        <label for="min-chan-count" class="form-number-label">Minimum Channel Count</label>
+        <input type="number" name="min-chan-count" min="0" access="false" id="min-chan-count">
     </div>
-    <div class="formbuilder-number form-group field-min-avg-cap">
-        <label for="min-avg-cap" class="formbuilder-number-label">Minimum Average Capacity</label>
-        <input type="number" name="min-avg-cap" access="false" id="min-avg-cap">
+    <div class="form-number form-group">
+        <label for="min-avg-cap" class="form-number-label">Minimum Average Capacity</label>
+        <input type="number" name="min-avg-cap" min="0" access="false" id="min-avg-cap">
     </div>
+        <input type="button" value="Submit" id='smit' >
+
+</div>
+<div id="result">
+    
 </div>
 </body>
 </html>
+
+<script src="{{ url_for('static', filename='script.js') }}" type="text/javascript"></script>
