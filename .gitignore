@@ -5,3 +5,4 @@ lightning_gym/envs/__pycache__/
 mbi_net.pt
 snapshots/*.json
 !snapshots/.gitkeep
+*.swp

@@ -3,7 +3,7 @@
 import configparser
 import json
 import sys
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from lightning_gym.graph_utils import *
 from lightning_gym.utils import *
 from lightning_gym.envs.lightning_network import NetworkEnvironment
@@ -48,8 +48,11 @@ class Cache(object):
     def clear(cls):
         return cls.cache.clear()
 
+@app.route('/', methods=['GET'])
+def send_html():
+    return render_template('index.html')
 
-@app.route('/', methods=['POST'])
+@app.route('/api', methods=['POST'])
 def run_sim():
     results = Cache.get(request.data)
     if results is None:
