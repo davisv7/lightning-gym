@@ -119,6 +119,7 @@ class NetworkEnvironment(Env):
             new_metric = self.reward_function()
 
         reward = new_metric - self.old_metric
+        self.old_metric = new_metric
         return reward
 
     def get_closeness(self):
