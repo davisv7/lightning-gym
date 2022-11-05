@@ -93,7 +93,7 @@ document.getElementById('smit').onclick = function() {
     function getResults(data) {
         var resultHtml = `<h3>Opening these channels will give you a betweenness score of:</h3><h3>${data.betweenness}</h3> <h4>Higher is better.</h4><ol>`;
         for (var rec of Object.keys(data.recommendations)) {
-            resultHtml += `<li><a href="https://amboss.space/node/${data.recommendations[rec]}">${rec || data.recommendations[rec]}</a></li>`
+            resultHtml += `<li><a href="https://amboss.space/node/${data.recommendations[rec]}">${rec || data.recommendations[rec].slice(0, 20)}</a></li>`
         }
 
         return resultHtml + "</ol>";
