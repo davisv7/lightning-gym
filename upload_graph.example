@@ -3,7 +3,7 @@
 # script to upload LND graph to remote web server
 
 # this docker method should work with umbrel nodes
-graph=$(docker exec -it $(docker ps -aqf "name=lnd") /bin/lncli describegraph)
+graph=$(docker exec -t $(docker ps -aqf "name=lnd") /bin/lncli describegraph)
 minigraph=$(echo $graph | jq -r tostring)
 echo $minigraph | ssh user@webserver.com -i ~/.ssh/id_rsa -T "cat > ~/graph.json"
 shahash=$(echo -n $minigraph | openssl sha1 )
