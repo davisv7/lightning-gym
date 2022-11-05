@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Script to download the LND channel graph from a public source
+
+remotegraphurl="https://webserver.com/graph.json"
+remotegraphhashurl="https://webserver.com/graph.sha1"
+currentgraph=/path/to/lightning-gym/snapshots/graph.json
+shahash=$(cat $currentgraph | openssl sha1)
+remoteshahash=$(curl $remotegraphhashurl)
+if [ $remoteshahash -ne $shahash ]
+then
+	curl $remotegraphhashrul > $currentgraph
+fi
+

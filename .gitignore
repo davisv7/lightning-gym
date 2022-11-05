@@ -3,5 +3,7 @@ venv/
 __pycache__/
 lightning_gym/envs/__pycache__/
 mbi_net.pt
+upload_graph.sh
+update_graph.sh
 snapshots/*.json
 !snapshots/.gitkeep
