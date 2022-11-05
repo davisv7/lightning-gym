@@ -1,47 +1,87 @@
 <!doctype html>
 <html>
 <head>
-<title>Lightning Network Channel Optimizer</title>
+<title>ChannelTips</title>
+<link rel="icon" href="{{ url_for('static',filename='neural.ico') }}">
 <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='style.css') }}" />
 <meta name="description" content="Find your next channel. Optimize your node's connectivity  while promoting decentralization">
 </head>
 <body>
+	<div class="container">
+		<h1>Lightning Network Channel Suggestions</h1>
+		<h4>Optimize connectivity while promoting a decentralized network.</h4>
+		<div class="flex justify-center">
+			<a href="{{ url_for('static',filename='paper.pdf') }}" target="_blank">The Paper</a>
+			<a href="https://github.com/davisv7/lightning-gym" target="_blank">The GitHub</a>
+		</div>
+  <img class="hero-img" src="{{ url_for('static',filename='hero.jpg')}}" />
   <div class="form">
+	  <h3>Calculate the Best Peers</h3>
+	  <div class="desc">
+		  Enter your <b>node pubkey</b> if you already have channels and you'd like them to be considered when selecting peers. You may also generate reccomendations for a new node by ommiting the pubkey. Enter your <b>budget</b> a.k.a the number of channels to recommend. Enter your targeted <b>fee PPM</b> you'd like to charge for these new connections.
+		</div>
+		<h3>Node Filters</h3>
+    <div class="desc">
+	    Define the <b>minimum number of channels</b> and <b>average capacity per channel</b> of nodes to suggest. Useful for filtering distant and poorly connected leaf nodes.
+    </div>
+ <h3>Channel Filters</h3>
+    <div class="desc">
+	    Define the <b>minimum and maximum sized channels</b> to include in the betweeness calculation. For example, you may want to optimize for the subgraph of greater than 1 BTC channels on mainnet.
+    </div>
+
+<div id="result" class="hidden">
+    
+</div>
+<div id="loader" class="hidden">
+	<img src="{{ url_for('static',filename='loading.gif') }}"/>	
+</div>	
+
+
     <div class="form-text form-group">
         <label for="pubkey" class="form-text-label">Pubkey</label>
-        <input type="text" name="pubkey" access="false" minlength="66" maxlength="66" id="pubkey">
+        <input type="text" name="pubkey" placeholder="node pubkey to consider existing channels..." access="false" minlength="66" maxlength="66" id="pubkey">
+	<div id="pubkey-msg" class="field-msg"></div>
     </div>
+    <div class="flex justify-center">
     <div class="form-number form-group">
         <label for="ppm" class="form-number-label">Fee PPM</label>
-        <input type="number" name="ppm" access="false" min="0" max="1000000" step="1" id="ppm">
-    </div>
-    <div class="formbuilder-number form-group">
-        <label for="budget" class="form-number-label">Total Budget (sats)</label>
-        <input type="number" name="budget" min="0" access="false" id="budget">
+        <input type="number" value="1" placeholder="number of sats per million..." name="ppm" access="false" min="0" max="1000000" step="1" id="ppm">
+	<div id="ppm-msg" class="field-msg"></div>
     </div>
     <div class="form-number form-group">
+        <label for="budget" class="form-number-label">Total Budget</label>
+        <input type="number" value="10" placeholder="number of sats..." name="budget" min="0" max="100" access="false" id="budget">
+	<div id="budget-msg" class="field-msg"></div>
+    </div>
+    </div>
+       <div class="flex justify-center">
+    <div class="form-number form-group">
         <label for="min-cap" class="form-number-label">Min Capacity</label>
-        <input type="number" name="min-cap" min="0" access="false" id="min-cap">
+        <input type="number" value="0" placeholder="number of sats..." name="min-cap" min="0" access="false" id="min-cap">
+	<div id="min-cap-msg" class="field-msg"></div>
     </div>
     <div class="form-number form-group"> 
         <label for="max-cap" class="form-number-label">Max Capacity</label>
-        <input type="number" name="max-cap" min="0" access="false" id="max-cap">
+        <input type="number" value="1000000000" placeholder="number of sats..." name="max-cap" min="0" access="false" id="max-cap">
+	<div id="max-cap-msg" class="field-msg"></div>
     </div>
+    </div>
+        <div class="flex justify-center">
     <div class="form-number form-group">
         <label for="min-chan-count" class="form-number-label">Minimum Channel Count</label>
-        <input type="number" name="min-chan-count" min="0" access="false" id="min-chan-count">
+        <input type="number" value="10" placeholder="number of sats..." name="min-chan-count" min="0" access="false" id="min-chan-count">
+	<div id="min-chan-count-msg" class="field-msg"></div>
     </div>
     <div class="form-number form-group">
         <label for="min-avg-cap" class="form-number-label">Minimum Average Capacity</label>
-        <input type="number" name="min-avg-cap" min="0" access="false" id="min-avg-cap">
+        <input type="number" value="1000000" placeholder="number of sats..." name="min-avg-cap" min="0" access="false" id="min-avg-cap">
+	<div id="min-avg-cap-msg" class="field-msg"></div>
     </div>
-        <input type="button" value="Submit" id='smit' >
+    </div>
+        <input class="button" type="button" value="Get Reccomendations" id='smit' >
 
 </div>
-<div id="result">
-    
 </div>
 </body>
 </html>
-
 <script src="{{ url_for('static', filename='script.js') }}" type="text/javascript"></script>

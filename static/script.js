@@ -1,12 +1,75 @@
 document.getElementById('smit').onclick = function(){ 	
 
-var budget = document.querySelector("[name='budget']").value;
-var ppm = document.querySelector("[name='ppm']").value;
-var node_id = document.querySelector("[name='pubkey']").value;
-var minimum_capacity = document.querySelector("[name='min-cap']").value;
-var maximum_capacity = document.querySelector("[name='max-cap']").value;
-var minimum_channels = document.querySelector("[name='min-chan-count']").value;
-var min_avg_capacity = document.querySelector("[name='min-avg-cap']").value;
+	var loaderElm = document.getElementById("loader"); 
+	var resultElm = document.getElementById("result");
+
+	// Error message fields
+	var pubkeyMsg = document.getElementById("pubkey-msg");
+	var ppmMsg = document.getElementById("ppm-msg");
+	var budgetMsg = document.getElementById("budget-msg");
+	var minCapMsg = document.getElementById("min-cap-msg");
+	var maxCapMsg = document.getElementById("max-cap-msg");
+	var minChanMsg = document.getElementById("min-chan-count-msg");
+	var minAvgCapMsg = document.getElementById("min-avg-cap-msg");
+	
+	// Field Values
+	var budget = document.querySelector("[name='budget']").value;
+	var ppm = document.querySelector("[name='ppm']").value;
+	var node_id = document.querySelector("[name='pubkey']").value;
+	var minimum_capacity = document.querySelector("[name='min-cap']").value;
+	var maximum_capacity = document.querySelector("[name='max-cap']").value;
+	var minimum_channels = document.querySelector("[name='min-chan-count']").value;
+	var min_avg_capacity = document.querySelector("[name='min-avg-cap']").value;
+
+	function validateForm(){
+		var isValid = true;
+		if (budget > 100){
+			budgetMsg.innerText = "Enter a number less than 100";
+			isValid = false;
+		}
+		if (budget < 0) {
+			budgetMsg.innerText = "Budget cannot be less then zero";
+			isValid = false;
+		}
+		if (minimum_capacity > maximum_capacity) {
+			minCapMsg.innerText = "Min capacity must be lower than max capacity";
+			maxCapMsg.innerText = "Max capacity must be higher than min capacity";
+			isValid = false;
+		}
+		if (ppm > 100000) {
+			ppmMsg.innerText = "Fee PPM must be less than 100,000";
+			isValid = false;
+		}
+		if (ppm < 0) {
+			ppmMsg.innerText = "Fee PPM cannot be less than zero";
+			isValid = false;
+		}
+		if (minimum_capacity < 0) {
+			minCapMsg.innerText = "Minimum capacity cannot be less than zero";
+			isValid = false;
+		}
+		if (minimum_capacity > 1000000000) {
+			minCapMsg.innerText = "Minimum capacity cannot be greater than 10 BTC (1 billion sats)";
+			isValid = false;
+		}
+		if (maximum_capacity < 0) {
+			maxCapMsg.innerText = "Maximum capacity cannot be less than zero";
+			isValid = false;
+		} 
+		if (maximum_capacity > 10000000000) {
+			maxCapMsg.innerText = "Maximum capacity cannot be greater than 10 BTC (1 billion sats)";
+			isValid = false;
+		}
+		if (minimum_channels < 1) {
+			minChanMsg.innerText = "Minimum channels must be greater than zero"
+			isValid = false;
+		}
+		if (min_avg_capacity < 20000) {
+			minAvgCapMsg.innerText = "Must be greater then 20,000";
+			isValid = false;
+		}
+		return isValid;
+	}
 
 var payload = {
     "env":{
@@ -27,8 +90,22 @@ var payload = {
     }
 }
 
+function getResults(data) {
+	var resultHtml = `<h3>Opening these channels will give you a betweenness score of:</h3><h3>${data.betweenness}</h3> <h4>Lower is better. But too low is centralizing.</h4><ol>`;
+	for (var rec of Object.keys(data.recommendations)){
+		resultHtml += `<li><a href="https://amboss.space/node/${data.recommendations[rec]}">${rec}</a></li>`
+	}
+	
+	return resultHtml + "</ol>";
 
-  fetch('/api', {
+}
+
+if (validateForm()){
+
+loaderElm.className = "";
+resultElm.className = "hidden";
+  
+fetch('/api', {
     method: 'POST',
     headers: {
       'Accept': 'application/json',
@@ -46,13 +123,17 @@ console.log("OK")
 
 
   }).then(data => {
-
-    document.getElementById('result').innerHTML = JSON.stringify(JSON.stringify(data));
+	loaderElm.className = "hidden";
+	resultElm.className = "";
+    resultElm.innerHTML = getResults(data);
 console.log({data})
   }).catch(function (err) {
 	// There was an error
+	loaderElm.className = "hidden";
 	console.warn('Something went wrong.', err);
 });
+
+}// end if validate
 
 
 
