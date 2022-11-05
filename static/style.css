@@ -9,13 +9,16 @@ body {
 	text-align: left;
 	width: 100%;
 }
+
 .flex {
 	display: flex;
 }
+
 .justify-center {
 	justify-content: center;
 	gap: 16px;
 }
+
 .container {
 	display: flex;
 	flex-direction: column;
@@ -23,21 +26,23 @@ body {
 	margin: 0px 15%;
 	text-align: center;
 }
+
 .desc {
-width: 70%;
-margin: 0px 15%;
-color: #9e9e9e;
-text-align: justify;
+	width: 70%;
+	margin: 0px 15%;
+	color: #9e9e9e;
+	text-align: justify;
 }
+
 .desc > b {
 	color: #000;
 }
+
 @media (max-width: 768px) {
 	.container, .desc {
 		width: calc(100% - 4em);
 		margin: 0 2em;
 	}
-		
 }
 
 .hero-img {
@@ -48,18 +53,21 @@ text-align: justify;
 .button {
 	background-color: #000;
 	color: #fff;
-            border: none;
-            text-decoration: none;
-            padding: 20px 20px;
-            margin: 20px 20px;
-            cursor: pointer;
+	border: none;
+	text-decoration: none;
+	padding: 20px 20px;
+	margin: 20px 20px;
+	cursor: pointer;
 }
+
 .hidden {
 	display: none;
 }
+
 li {
 	text-align: left;
 }
+
 .field-msg {
-color: red;
+	color: red;
 }
