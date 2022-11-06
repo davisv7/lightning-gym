@@ -27,7 +27,7 @@ def convert_to_dict(config) -> defaultdict:
 
 
 class Cache(object):
-    cache = SimpleCache(threshold=1000, default_timeout=1000)
+    cache = SimpleCache(threshold=1000, default_timeout=12*60*60)
 
     @classmethod
     def get(cls, key=None):
