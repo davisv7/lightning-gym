@@ -28,7 +28,7 @@ class NetworkEnvironment(Env):
         self.graph_type = config.get("env", "graph_type")
         self.filename = config.get("env", "filename", fallback=None)
         self.cutoff = config.getint("env", "cutoff")
-        self.ppm = config.getfloat("env", "ppm", fallback=0.1)
+        self.ppm = config.getfloat("env", "ppm", fallback=1)
         self.n = config.getint("env", "n", fallback=None)
         self.reward_metric = config.get("env", "reward_metric", fallback="betweenness")
         self.config = config
