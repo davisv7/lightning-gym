@@ -99,7 +99,7 @@ class DiscreteActorCritic:
             #     self.memory_replay_buffer.push(*sars)
             #     old_state = mN
         if not self._no_calc:
-            self.logger.add_log('tot_reward', self.problem.btwn_cent)
+            self.logger.add_log('tot_reward', self.problem.get_betweenness())
         # discount past rewards, rewards of the past are worth less
         for i in reversed(range(0, R.shape[0] - 1)):
             R[i] = R[i] + self.gamma * R[i + 1]
@@ -180,7 +180,7 @@ class DiscreteActorCritic:
         self._no_calc = True
         [_, _, _] = self.run_episode()
         self.problem.get_reward()
-        return self.problem.btwn_cent
+        return self.problem.get_betweenness()
 
     def save_model(self):  # takes what we learned
         torch.save(self.model.state_dict(), self.path)
