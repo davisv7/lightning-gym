@@ -294,7 +294,7 @@ class NetworkEnvironment(Env):
             # pageranks = np.array(self.ig_g.pagerank())
             # pageranks = scaler.fit_transform(pageranks.reshape(-1, 1)).squeeze()
             # pageranks = torch.Tensor(pageranks).unsqueeze(-1)
-            # degrees = np.array(self.ig_g.strength(mode="in"))
+            # degrees = np.array(self.ig_g.degree(mode="out"))
             # norm_degrees = scaler.fit_transform(degrees.reshape(-1, 1)).squeeze()
             # norm_degrees = torch.Tensor(norm_degrees).unsqueeze(-1)
             #
