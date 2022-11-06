@@ -44,7 +44,7 @@ def create_snapshot_env(config):
     if graph_filters.getboolean("undirected"):
         g = undirected(g)
     if graph_filters.getboolean("unweighted"):
-        nx.set_edge_attributes(g, values=0.1, name='cost')
+        nx.set_edge_attributes(g, values=1, name='cost')
 
     if ds:
         g = down_sample(g, config)
