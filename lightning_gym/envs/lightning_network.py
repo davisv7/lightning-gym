@@ -138,6 +138,16 @@ class NetworkEnvironment(Env):
         norm_betweenness = torch.Tensor(betweenness).unsqueeze(-1)
         return norm_betweenness.squeeze().numpy().tolist()
 
+    def get_edge_betweennesses(self):
+        betweenness = np.array(self.ig_g.edge_betweenness(directed=True, weights="cost"))
+        betweenness = betweenness / self.norm
+        norm_betweenness = torch.Tensor(betweenness).unsqueeze(-1)
+        return norm_betweenness.squeeze().numpy().tolist()
+
+    def get_strengths(self):
+        strengths = np.array(self.ig_g.strength(self.ig_g.vs()))
+        return strengths.squeeze().numpy().tolist()
+
     def get_recommendations(self):
         """
         Returns a sorted list of recommendations as indicated by actions_taken.
