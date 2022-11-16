@@ -63,8 +63,9 @@ class DiscreteActorCritic:
 
             # convolve our graph
             costs = torch.Tensor(self.problem.ig_g.es()["cost"])
-            # [pi, val] = self.model(G, w=costs)
-            [pi, val] = self.model(G)
+            # costs = torch.Tensor(self.problem.get_edge_betweennesses())
+            [pi, val] = self.model(G, w=costs)
+            # [pi, val] = self.model(G)
 
             # Get action from policy network
             action = self.predict_action(pi, illegal_actions)

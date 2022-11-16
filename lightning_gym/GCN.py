@@ -9,8 +9,8 @@ import torch.nn as nn
 from dgl.nn.pytorch import GraphConv, EdgeWeightNorm
 from dgl import mean_nodes
 from copy import deepcopy
-
 from sklearn.preprocessing import MinMaxScaler
+from scipy import stats
 
 
 class GCN(nn.Module):
@@ -43,13 +43,13 @@ class GCN(nn.Module):
         for i in range(n_layers):
             if i == 0:
                 # input layer
-                self.layers.append(GraphConv(in_feats, hid_feats, norm="left", activation=activation))
+                self.layers.append(GraphConv(in_feats, hid_feats, norm="none", activation=activation))
             elif i != n_layers - 1:
                 # hidden layer
-                self.layers.append(GraphConv(hid_feats, hid_feats, norm="left", activation=activation))
+                self.layers.append(GraphConv(hid_feats, hid_feats, norm="none", activation=activation))
             else:
                 # output layer
-                self.layers.append(GraphConv(hid_feats, out_feats, norm="left"))
+                self.layers.append(GraphConv(hid_feats, out_feats, norm="none"))
 
     def forward(self, g, w=None):
         """
@@ -59,13 +59,14 @@ class GCN(nn.Module):
         :return: h tensor of node out-features, mN the column-wise mean of these features
         """
         h = deepcopy(g.ndata['features'])  # Get features from graph
-        norm = EdgeWeightNorm(norm='left')
-        scaler = MinMaxScaler((0, 1))
+        # norm = EdgeWeightNorm(norm='left')
+        # scaler = MinMaxScaler((0, 1))
+        if w is not None:
+            w = torch.Tensor(stats.rankdata(w, "average") / len(w))
+            # w = norm(g, w.squeeze())
+            # w = torch.Tensor(scaler.fit_transform(w.reshape(-1, 1)))
         for i, layer in enumerate(self.layers):
             if w is not None:
-                # w = norm(g, w.squeeze())
-                w = 1 / (w + 1)
-                w = torch.Tensor(scaler.fit_transform(w.reshape(-1, 1)))
                 h = layer(g, h, edge_weight=w)
             else:
                 h = layer(g, h)  # Features after they been convoluted, these represent the nodes

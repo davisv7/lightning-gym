@@ -142,14 +142,8 @@ class TrainedGreedyAgent:
         best_action = None
         scaler = MinMaxScaler()
 
-        costs = 1 / (np.array(self.problem.ig_g.es()["cost"]) + 1)
-        # costs = -np.array(self.problem.ig_g.es()["cost"])
-        costs = scaler.fit_transform(costs.reshape(-1, 1)).squeeze()
-        # costs = 1 - costs
-        costs = torch.Tensor(costs).unsqueeze(-1)
-        # th_layer = torch.nn.Threshold(-0.001, 1)
-        # costs = th_layer(costs)
-        # costs = 1 + costs
+        costs = torch.Tensor(self.problem.ig_g.es()["cost"])
+        # costs = torch.Tensor(self.problem.get_edge_betweennesses())
         [pi, _] = self.model(G, w=costs)
         # [pi, _] = self.model(G)
         if self.problem.num_actions + self.problem.budget_offset < 2 or self.n == 1:
