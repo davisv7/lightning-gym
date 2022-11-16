@@ -107,7 +107,6 @@ class NetworkEnvironment(Env):
         Could also be represented by the betweenness of the most recently added edge.
         :return:
         """
-        weights = "cost"
         key = "".join(list(map(str, self.get_recommendations())))
 
         if self.repeat and key in self.reward_dict:
@@ -119,7 +118,7 @@ class NetworkEnvironment(Env):
             new_metric = self.reward_function()
 
         reward = new_metric - self.old_metric
-        self.old_metric = new_metric
+        # self.old_metric = new_metric
         return reward
 
     def get_closeness(self):
