@@ -68,8 +68,8 @@ def print_config(config):
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()
-    # config_loc = "./configs/train_scale_free.conf"
-    config_loc = "./configs/train_snapshot.conf"
+    config_loc = "./configs/train_scale_free.conf"
+    # config_loc = "./configs/train_snapshot.conf"
     config.read(config_loc)
     print_config(config)
     seed = config["env"].getint("seed", fallback=None)
