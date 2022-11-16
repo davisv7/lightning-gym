@@ -116,7 +116,7 @@ def nx_to_ig(nx_graph, add_self_loop=True):
 
     # add normal edges to igraph
     for u, v in nx_graph.edges():
-        c1 = float(nx_graph[u][v].get('cost', 0.1))
+        c1 = float(nx_graph[u][v].get('cost', 1))
         edge_list.append((u, v))
         costs.append(c1)
 
@@ -125,7 +125,7 @@ def nx_to_ig(nx_graph, add_self_loop=True):
         max_cost = max(costs)
         for node in nx_graph.nodes():
             edge_list.append((node, node))
-            costs.append(max_cost + 1)  # keeps these self loops from affecting betweenness algorithm
+            costs.append(1e6)  # keeps these self loops from affecting betweenness algorithm
     ig_g.add_edges(edge_list, {'cost': costs})
     return ig_g
 
